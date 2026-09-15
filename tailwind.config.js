@@ -8,10 +8,10 @@ export default {
   theme: {
     extend: {
       colors: {
-        primary: '#1B3C53',
-        secondary: '#456882',
-        sand: '#D2C1B6',
-        cream: '#F9F3EF',
+        primary: '#1B3C53',   // Primary Dark
+        secondary: '#456882', // Secondary Slate Blue
+        sand: '#D2C1B6',      // Warm Sand
+        cream: '#F9F3EF',     // Soft Cream
       }
     },
   },
