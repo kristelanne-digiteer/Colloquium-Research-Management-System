@@ -1,40 +1,46 @@
-import React from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider } from './context/authContext';
+import ProtectedRoute from './routes/protectedRoutes';
+import AppLayout from './components/layout/appLayout';
 
-function App() {
+import SignUp from './pages/auth/signUp.jsx';
+import VerifyPin from './pages/auth/verifyPin.jsx';
+import Login from './pages/auth/login.jsx';
+import ForgotPassword from './pages/auth/forgotPassword.jsx';
+import ResetPin from './pages/auth/resetPin.jsx';
+import ResetSuccess from './pages/auth/resetSuccess.jsx';
+import AccountSettings from './pages/auth/accountSettings.jsx';
+import Overview from './pages/dashboard/overview.jsx';
+import MySubmissions from './pages/submissions/mySubmissions.jsx';
+import ReviewAssignments from './pages/review/reviewAssignments.jsx';
+import Notifications from './pages/notifications/notifications.jsx';
+
+export default function App() {
   return (
-    <div className="min-h-screen bg-cream text-primary p-8 font-sans">
-      <div className="max-w-4xl mx-auto bg-white p-6 rounded-xl shadow-md border border-sand">
-        <h1 className="text-3xl font-bold text-primary mb-2">
-          Colloquium Research Management System
-        </h1>
-        <p className="text-secondary mb-6">
-          eme eme muna.
-        </p>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="p-4 bg-cream rounded-lg border border-sand">
-            <h2 className="font-semibold text-primary">Theme Colors Test</h2>
-            <div className="flex gap-2 mt-2">
-              <span className="w-8 h-8 rounded bg-primary inline-block" title="Primary"></span>
-              <span className="w-8 h-8 rounded bg-secondary inline-block" title="Secondary"></span>
-              <span className="w-8 h-8 rounded bg-sand inline-block" title="Warm Sand"></span>
-              <span className="w-8 h-8 rounded bg-cream border border-gray-300 inline-block" title="Soft Cream"></span>
-            </div>
-          </div>
-          
-          <div className="p-4 bg-cream rounded-lg border border-sand">
-            <h2 className="font-semibold text-primary">example ni bestie test run</h2>
-            <div className="flex flex-wrap gap-2 mt-2">
-              <span className="px-3 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">Approved</span>
-              <span className="px-3 py-1 bg-yellow-100 text-yellow-800 text-xs font-medium rounded-full">For Review</span>
-              <span className="px-3 py-1 bg-red-100 text-red-800 text-xs font-medium rounded-full">Rejected</span>
-              <span className="px-3 py-1 bg-gray-100 text-gray-800 text-xs font-medium rounded-full">Resubmission</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+    <BrowserRouter>
+      <AuthProvider>
+        <Routes>
+          <Route path="/signup" element={<SignUp />} />
+          <Route path="/verify-pin" element={<VerifyPin />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-pin" element={<ResetPin />} />
+          <Route path="/reset-success" element={<ResetSuccess />} />
+
+          <Route element={<ProtectedRoute />}>
+            <Route element={<AppLayout />}>
+              <Route path="/overview" element={<Overview />} />
+              <Route path="/submissions" element={<MySubmissions />} />
+              <Route path="/review-assignments" element={<ReviewAssignments />} />
+              <Route path="/notifications" element={<Notifications />} />
+              <Route path="/account-settings" element={<AccountSettings />} />
+              <Route path="/" element={<Navigate to="/overview" replace />} />
+            </Route>
+          </Route>
+
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        </Routes>
+      </AuthProvider>
+    </BrowserRouter>
   );
 }
-
-export default App;
