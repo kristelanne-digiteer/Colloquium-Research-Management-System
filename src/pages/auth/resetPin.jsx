@@ -38,8 +38,8 @@ export default function ResetPin() {
     e.preventDefault();
     setErrors({});
 
-    if (pin.length !== 5) {
-      setErrors({ pin: 'Enter the 5-digit code sent to your email.' });
+    if (pin.length !== 6) {
+      setErrors({ pin: 'Enter the 6-digit code sent to your email.' });
       return;
     }
 
@@ -138,12 +138,12 @@ export default function ResetPin() {
       title="Enter reset code"
       subtitle={
         email
-          ? `Enter the 5-digit code we sent to ${email}.`
-          : 'Enter the 5-digit code we sent to your email.'
+          ? `Enter the 6-digit code we sent to ${email}.`
+          : 'Enter the 6-digit code we sent to your email.'
       }
     >
       <form onSubmit={handleVerifyCode} className="space-y-6">
-        <PinInput length={5} value={pin} onChange={setPin} error={errors.pin} />
+        <PinInput length={6} value={pin} onChange={setPin} error={errors.pin} />
 
         {resendMessage && (
           <p className="text-center text-sm font-medium text-green-600">{resendMessage}</p>
