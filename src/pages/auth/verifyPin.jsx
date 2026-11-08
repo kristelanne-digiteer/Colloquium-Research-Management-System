@@ -9,6 +9,7 @@ import { useAuth } from '../../context/authContext';
 import { supabase } from '../../lib/supabaseClient';
 
 const RESEND_SECONDS = 60;
+const PIN_LENGTH = 6;
 
 export default function VerifyPin() {
   const location = useLocation();
@@ -37,12 +38,18 @@ export default function VerifyPin() {
     return () => clearInterval(timer);
   }, [secondsLeft]);
 
+  // Auto-verify as soon as all digits are filled (paste or typing)
+  useEffect(() => {
+    if (pin.length === PIN_LENGTH && !loading) handleSubmit();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pin]);
+
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    e?.preventDefault();
     setError('');
 
-    if (pin.length !== 5) {
-      setError('Enter the 5-digit code sent to your email.');
+    if (pin.length !== PIN_LENGTH) {
+      setError(`Enter the ${PIN_LENGTH}-digit code sent to your email.`);
       return;
     }
 
@@ -94,12 +101,12 @@ export default function VerifyPin() {
       title="Verify your email"
       subtitle={
         email
-          ? `Enter the 5-digit code we sent to ${email}.`
-          : 'Enter the 5-digit code we sent to your email.'
+          ? `Enter the ${PIN_LENGTH}-digit code we sent to ${email}.`
+          : `Enter the ${PIN_LENGTH}-digit code we sent to your email.`
       }
     >
       <form onSubmit={handleSubmit} className="space-y-6">
-        <PinInput length={5} value={pin} onChange={setPin} error={error} />
+        <PinInput length={PIN_LENGTH} value={pin} onChange={setPin} error={error} />
 
         {resendMessage && (
           <p className="text-center text-sm font-medium text-green-600">{resendMessage}</p>

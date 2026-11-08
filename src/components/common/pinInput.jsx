@@ -1,10 +1,20 @@
 import { useRef } from 'react';
 
-export default function PinInput({ length = 5, value, onChange, error }) {
+export default function PinInput({ length = 6, value, onChange, error }) {
   const inputsRef = useRef([]);
 
   const handleChange = (index, rawValue) => {
-    const digit = rawValue.replace(/[^0-9]/g, '').slice(-1);
+    const digits = rawValue.replace(/[^0-9]/g, '');
+
+    // Autofill / multi-character input: fill all boxes at once
+    if (digits.length >= length) {
+      const filled = digits.slice(0, length);
+      onChange(filled);
+      inputsRef.current[Math.min(filled.length, length - 1)]?.focus();
+      return;
+    }
+
+    const digit = digits.slice(-1);
     const nextValue = value.split('');
     nextValue[index] = digit;
     const joined = nextValue.join('').slice(0, length);
@@ -44,7 +54,8 @@ export default function PinInput({ length = 5, value, onChange, error }) {
             ref={(el) => (inputsRef.current[index] = el)}
             type="text"
             inputMode="numeric"
-            maxLength={1}
+            autoComplete="one-time-code"
+            autoFocus={index === 0}
             value={value[index] || ''}
             onChange={(e) => handleChange(index, e.target.value)}
             onKeyDown={(e) => handleKeyDown(index, e)}
