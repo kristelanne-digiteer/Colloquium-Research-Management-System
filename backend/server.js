@@ -3,6 +3,8 @@ require('dotenv').config(); // must be first so process.env is filled before oth
 const express = require('express');
 const cors = require('cors');
 const authRoutes = require('./routes/authRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
+const notificationService = require('./services/notificationService');
 
 const app = express();
 
@@ -12,6 +14,7 @@ app.use(express.json());
 
 // --- ERICH PART: Auth & Notification Endpoints ---
 app.use('/api/auth', authRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Health check endpoint for team integration
 app.get('/api/health', (req, res) => {
@@ -30,4 +33,5 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`[Backend] Server running on port ${PORT}`);
+  notificationService.start();
 });
