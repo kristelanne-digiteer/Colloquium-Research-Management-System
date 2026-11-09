@@ -10,7 +10,7 @@ export default function Overview() {
         Welcome back{profile?.full_name ? `, ${profile.full_name.split(' ')[0]}` : ''}
       </h1>
       <p className="mt-1 text-sm text-secondary-500 dark:text-secondary-400">
-        You're viewing Colloquium as {activeRole === 'author' ? 'an Author' : 'a Reviewer'}.
+        You're viewing Colloquium as {{ author: 'an Author', reviewer: 'a Reviewer', chair: 'the EC Chair' }[activeRole]}.
       </p>
 
       <div className="mt-8 grid gap-4 sm:grid-cols-3">

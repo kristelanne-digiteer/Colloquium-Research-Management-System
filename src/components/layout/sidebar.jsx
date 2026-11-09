@@ -7,6 +7,10 @@ import {
   Bell,
   Settings,
   LogOut,
+  Inbox,
+  Users,
+  FileSignature,
+  PieChart,
 } from 'lucide-react';
 import { useAuth } from '../../context/authContext';
 
@@ -18,9 +22,18 @@ const navItems = [
   { to: '/account-settings', label: 'Account Settings', icon: Settings },
 ];
 
+const chairNavItems = [
+  { to: '/chair/submissions', label: 'Submissions', icon: Inbox },
+  { to: '/chair/reviewers', label: 'Peer Reviewers', icon: Users },
+  { to: '/chair/letters', label: 'Formal Letters', icon: FileSignature },
+  { to: '/chair/reports', label: 'Reports', icon: PieChart },
+  { to: '/account-settings', label: 'Account Settings', icon: Settings },
+];
+
 export default function Sidebar({ onNavigate }) {
   const navigate = useNavigate();
-  const { user, profile, signOut } = useAuth();
+  const { user, profile, signOut, activeRole } = useAuth();
+  const items = activeRole === 'chair' ? chairNavItems : navItems;
 
   const handleLogout = async () => {
     await signOut();
@@ -40,7 +53,7 @@ export default function Sidebar({ onNavigate }) {
       </div>
 
       <nav className="flex-1 space-y-1 px-3">
-        {navItems.map(({ to, label, icon: Icon }) => (
+        {items.map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}
             to={to}
