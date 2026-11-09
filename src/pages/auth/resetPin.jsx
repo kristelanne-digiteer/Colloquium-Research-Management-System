@@ -7,12 +7,15 @@ import FormInput from '../../components/common/formInput';
 import Button from '../../components/common/button';
 import { useAuth } from '../../context/authContext';
 
+
 const RESEND_SECONDS = 60;
+
 
 export default function ResetPin() {
   const location = useLocation();
   const navigate = useNavigate();
   const { verifyRecoveryOtp, sendPasswordResetOtp, updatePassword } = useAuth();
+
 
   const email = location.state?.email;
   const [step, setStep] = useState('code'); // 'code' | 'password'
@@ -24,9 +27,11 @@ export default function ResetPin() {
   const [resendMessage, setResendMessage] = useState('');
   const [secondsLeft, setSecondsLeft] = useState(RESEND_SECONDS);
 
+
   useEffect(() => {
     if (!email) navigate('/forgot-password', { replace: true });
   }, [email, navigate]);
+
 
   useEffect(() => {
     if (secondsLeft <= 0) return;
@@ -34,30 +39,37 @@ export default function ResetPin() {
     return () => clearInterval(timer);
   }, [secondsLeft]);
 
+
   const handleVerifyCode = async (e) => {
     e.preventDefault();
     setErrors({});
 
-    if (pin.length !== 5) {
-      setErrors({ pin: 'Enter the 5-digit code sent to your email.' });
+
+    if (pin.length !== 6) {
+      setErrors({ pin: 'Enter the 6-digit code sent to your email.' });
       return;
     }
+
 
     setLoading(true);
     const { error } = await verifyRecoveryOtp({ email, token: pin });
     setLoading(false);
+
 
     if (error) {
       setErrors({ pin: error.message });
       return;
     }
 
+
     setStep('password');
   };
+
 
   const handleSetPassword = async (e) => {
     e.preventDefault();
     setErrors({});
+
 
     const nextErrors = {};
     if (passwords.password.length < 8)
@@ -65,22 +77,27 @@ export default function ResetPin() {
     if (passwords.confirmPassword !== passwords.password)
       nextErrors.confirmPassword = 'Passwords do not match.';
 
+
     if (Object.keys(nextErrors).length) {
       setErrors(nextErrors);
       return;
     }
 
+
     setLoading(true);
     const { error } = await updatePassword({ password: passwords.password });
     setLoading(false);
+
 
     if (error) {
       setErrors({ password: error.message });
       return;
     }
 
+
     navigate('/reset-success');
   };
+
 
   const handleResend = async () => {
     setResendMessage('');
@@ -88,14 +105,17 @@ export default function ResetPin() {
     const { error } = await sendPasswordResetOtp({ email });
     setResending(false);
 
+
     if (error) {
       setErrors({ pin: error.message });
       return;
     }
 
+
     setResendMessage('A new code has been sent.');
     setSecondsLeft(RESEND_SECONDS);
   };
+
 
   if (step === 'password') {
     return (
@@ -133,25 +153,29 @@ export default function ResetPin() {
     );
   }
 
+
   return (
     <AuthLayout
       title="Enter reset code"
       subtitle={
         email
-          ? `Enter the 5-digit code we sent to ${email}.`
-          : 'Enter the 5-digit code we sent to your email.'
+          ? `Enter the 6-digit code we sent to ${email}.`
+          : 'Enter the 6-digit code we sent to your email.'
       }
     >
       <form onSubmit={handleVerifyCode} className="space-y-6">
-        <PinInput length={5} value={pin} onChange={setPin} error={errors.pin} />
+        <PinInput length={6} value={pin} onChange={setPin} error={errors.pin} />
+
 
         {resendMessage && (
           <p className="text-center text-sm font-medium text-green-600">{resendMessage}</p>
         )}
 
+
         <Button type="submit" loading={loading}>
           Continue
         </Button>
+
 
         <div className="text-center text-sm text-slate-500 dark:text-slate-400">
           {secondsLeft > 0 ? (
@@ -169,6 +193,7 @@ export default function ResetPin() {
             </button>
           )}
         </div>
+
 
         <Link
           to="/forgot-password"

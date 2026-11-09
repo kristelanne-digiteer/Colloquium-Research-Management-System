@@ -245,12 +245,12 @@ function ToggleSwitch({ checked, onChange }) {
       role="switch"
       aria-checked={checked}
       onClick={onChange}
-      className={`relative h-6 w-11 flex-shrink-0 rounded-full transition-colors duration-200 ${
+      className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors duration-200 ${
         checked ? 'bg-primary-600' : 'bg-slate-300 dark:bg-slate-700'
       }`}
     >
       <span
-        className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-200 ${
+        className={`absolute left-0 top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-200 ${
           checked ? 'translate-x-[22px]' : 'translate-x-0.5'
         }`}
       />
