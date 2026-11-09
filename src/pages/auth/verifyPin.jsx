@@ -8,15 +8,20 @@ import PinInput from '../../components/common/pinInput';
 import { useAuth } from '../../context/authContext';
 import { supabase } from '../../lib/supabaseClient';
 
+
 const RESEND_SECONDS = 60;
+const PIN_LENGTH = 6;
+
 
 export default function VerifyPin() {
   const location = useLocation();
   const navigate = useNavigate();
   const { verifySignupOtp, resendSignupOtp, updateProfile } = useAuth();
 
+
   const email = location.state?.email;
   const photoFile = location.state?.photoFile;
+
 
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
@@ -25,11 +30,13 @@ export default function VerifyPin() {
   const [resendMessage, setResendMessage] = useState('');
   const [secondsLeft, setSecondsLeft] = useState(RESEND_SECONDS);
 
+
   useEffect(() => {
     if (!email) {
       navigate('/signup', { replace: true });
     }
   }, [email, navigate]);
+
 
   useEffect(() => {
     if (secondsLeft <= 0) return;
@@ -37,23 +44,35 @@ export default function VerifyPin() {
     return () => clearInterval(timer);
   }, [secondsLeft]);
 
+
+  // Auto-verify as soon as all digits are filled (paste or typing)
+  useEffect(() => {
+    if (pin.length === PIN_LENGTH && !loading) handleSubmit();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pin]);
+
+
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    e?.preventDefault();
     setError('');
 
-    if (pin.length !== 5) {
-      setError('Enter the 5-digit code sent to your email.');
+
+    if (pin.length !== PIN_LENGTH) {
+      setError(`Enter the ${PIN_LENGTH}-digit code sent to your email.`);
       return;
     }
 
+
     setLoading(true);
     const { error: verifyError } = await verifySignupOtp({ email, token: pin });
+
 
     if (verifyError) {
       setLoading(false);
       setError(verifyError.message);
       return;
     }
+
 
     if (photoFile) {
       const { data: sessionData } = await supabase.auth.getSession();
@@ -70,9 +89,11 @@ export default function VerifyPin() {
       }
     }
 
+
     setLoading(false);
     navigate('/', { replace: true });
   };
+
 
   const handleResend = async () => {
     setResendMessage('');
@@ -80,34 +101,40 @@ export default function VerifyPin() {
     const { error: resendError } = await resendSignupOtp({ email });
     setResending(false);
 
+
     if (resendError) {
       setError(resendError.message);
       return;
     }
 
+
     setResendMessage('A new code has been sent.');
     setSecondsLeft(RESEND_SECONDS);
   };
+
 
   return (
     <AuthLayout
       title="Verify your email"
       subtitle={
         email
-          ? `Enter the 5-digit code we sent to ${email}.`
-          : 'Enter the 5-digit code we sent to your email.'
+          ? `Enter the ${PIN_LENGTH}-digit code we sent to ${email}.`
+          : `Enter the ${PIN_LENGTH}-digit code we sent to your email.`
       }
     >
       <form onSubmit={handleSubmit} className="space-y-6">
-        <PinInput length={5} value={pin} onChange={setPin} error={error} />
+        <PinInput length={PIN_LENGTH} value={pin} onChange={setPin} error={error} />
+
 
         {resendMessage && (
           <p className="text-center text-sm font-medium text-green-600">{resendMessage}</p>
         )}
 
+
         <Button type="submit" loading={loading}>
           Verify account
         </Button>
+
 
         <div className="text-center text-sm text-slate-500 dark:text-slate-400">
           {secondsLeft > 0 ? (
@@ -126,6 +153,7 @@ export default function VerifyPin() {
           )}
         </div>
 
+
         <Link
           to="/signup"
           className="flex items-center justify-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400"
@@ -137,3 +165,4 @@ export default function VerifyPin() {
     </AuthLayout>
   );
 }
+
