@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/authContext';
 import ProtectedRoute from './routes/protectedRoutes';
 import AppLayout from './components/layout/appLayout';
+import AuthorSubmissionForm from './components/AuthorSubmissionForm';
 
 import SignUp from './pages/auth/signUp.jsx';
 import VerifyPin from './pages/auth/verifyPin.jsx';
@@ -27,6 +28,7 @@ export default function App() {
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-pin" element={<ResetPin />} />
           <Route path="/reset-success" element={<ResetSuccess />} />
+          <Route path="/author-submission" element={<AuthorSubmissionForm />} />
 
           <Route element={<ProtectedRoute />}>
             <Route element={<AppLayout />}>
