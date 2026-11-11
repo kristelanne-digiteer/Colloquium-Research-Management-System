@@ -12,11 +12,13 @@ const MOCK_USER = {
 
 const MOCK_PROFILE = {
   id: 'dev-user-0001',
-  full_name: 'Dev Tester',
+  name: 'Dev Tester',
   bio: 'Frontend preview account — no backend connected yet.',
   affiliation: 'Colloquium University',
-  work_field: 'Computer Science',
-  avatar_url: '',
+  field_of_study: 'Computer Science',
+  expertise_tracks: ['Computer Science'],
+  phone_number: '',
+  profile_photo_url: '',
   notification_preferences: {
     email: true,
     submissionUpdates: true,
@@ -153,11 +155,15 @@ export function AuthProvider({ children }) {
       setProfile((prev) => ({ ...prev, ...updates }));
       return { data: { ...profile, ...updates }, error: null };
     }
-    if (!session?.user) return { error: new Error('Not authenticated') };
+
+    const { data: sessionData } = await supabase.auth.getSession();
+    const userId = sessionData?.session?.user?.id;
+    if (!userId) return { error: new Error('Not authenticated') };
+
     const { data, error } = await supabase
       .from('profiles')
       .update(updates)
-      .eq('id', session.user.id)
+      .eq('id', userId)
       .select()
       .single();
     if (!error) setProfile(data);
