@@ -3,9 +3,12 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Mail, Lock, User, Building2, BookOpen, Phone } from 'lucide-react';
 import AuthLayout from '../../components/auth/authLayout';
 import FormInput from '../../components/common/formInput';
+import SelectField from '../../components/common/selectField';
+import ExpertiseTracks from '../../components/common/expertiseTracks';
 import Button from '../../components/common/button';
 import PhotoDropzone from '../../components/common/photoDropzone';
 import { useAuth } from '../../context/authContext';
+import { FIELD_OF_STUDY_GROUPS } from '../../lib/options';
 
 export default function SignUp() {
   const navigate = useNavigate();
@@ -18,6 +21,7 @@ export default function SignUp() {
     confirmPassword: '',
     affiliation: '',
     fieldOfStudy: '',
+    expertiseTracks: [''],
     phone: '',
   });
   const [photoFile, setPhotoFile] = useState(null);
@@ -74,7 +78,13 @@ export default function SignUp() {
       return;
     }
 
-    navigate('/verify-pin', { state: { email: form.email, photoFile } });
+    navigate('/verify-pin', {
+      state: {
+        email: form.email,
+        photoFile,
+        expertiseTracks: form.expertiseTracks.map((t) => t.trim()).filter(Boolean),
+      },
+    });
   };
 
   const handleGoogleSignUp = async () => {
@@ -148,15 +158,20 @@ export default function SignUp() {
           autoComplete="organization"
           required
         />
-        <FormInput
+        <SelectField
           label="Field of study"
           name="fieldOfStudy"
           icon={BookOpen}
-          placeholder="e.g. Computer Science"
           value={form.fieldOfStudy}
           onChange={handleChange}
           error={errors.fieldOfStudy}
+          groups={FIELD_OF_STUDY_GROUPS}
+          placeholder="Select your field of study"
           required
+        />
+        <ExpertiseTracks
+          value={form.expertiseTracks}
+          onChange={(next) => setForm((prev) => ({ ...prev, expertiseTracks: next }))}
         />
         <FormInput
           label="Phone number"

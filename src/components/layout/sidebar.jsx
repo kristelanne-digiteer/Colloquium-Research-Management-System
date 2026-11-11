@@ -27,8 +27,8 @@ export default function Sidebar({ onNavigate }) {
     navigate('/login', { replace: true });
   };
 
-  const displayName = profile?.full_name || user?.email || 'Your account';
-  const initial = (profile?.full_name || user?.email || '?').charAt(0).toUpperCase();
+  const displayName = profile?.name || user?.email || 'Your account';
+  const initial = (profile?.name || user?.email || '?').charAt(0).toUpperCase();
 
   return (
     <aside className="flex h-full w-64 flex-shrink-0 flex-col border-r border-secondary-200/60 bg-primary-600 text-white dark:border-secondary-800">
@@ -62,8 +62,8 @@ export default function Sidebar({ onNavigate }) {
       <div className="border-t border-white/10 px-3 py-4">
         <div className="flex items-center gap-3 rounded-xl px-2 py-2">
           <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center overflow-hidden rounded-full bg-white/15 text-sm font-bold">
-            {profile?.avatar_url ? (
-              <img src={profile.avatar_url} alt={displayName} referrerPolicy="no-referrer" className="h-full w-full object-cover" />
+            {profile?.profile_photo_url ? (
+              <img src={profile.profile_photo_url} alt={displayName} referrerPolicy="no-referrer" className="h-full w-full object-cover" />
             ) : (
               initial
             )}
