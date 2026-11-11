@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { Outlet } from 'react-router-dom';
-import { Menu, X } from 'lucide-react';
+import { Menu } from 'lucide-react';
 import Sidebar from './sidebar';
-import RoleSwitch from './roleSwitch';
 
 export default function AppLayout() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -28,16 +27,15 @@ export default function AppLayout() {
       )}
 
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="flex items-center justify-between gap-4 border-b border-secondary-200/70 bg-white/80 px-4 py-3 backdrop-blur dark:border-secondary-800 dark:bg-surface-dark/80 sm:px-6">
+        {/* Top bar only holds the mobile menu button, so hide it on desktop */}
+        <header className="flex items-center gap-4 border-b border-secondary-200/70 bg-white/80 px-4 py-3 backdrop-blur dark:border-secondary-800 dark:bg-surface-dark/80 sm:px-6 lg:hidden">
           <button
             onClick={() => setMobileNavOpen(true)}
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-secondary-600 hover:bg-secondary-100 dark:text-secondary-300 dark:hover:bg-secondary-800 lg:hidden"
+            aria-label="Open menu"
+            className="flex h-9 w-9 items-center justify-center rounded-lg text-secondary-600 hover:bg-secondary-100 dark:text-secondary-300 dark:hover:bg-secondary-800"
           >
             <Menu className="h-5 w-5" />
           </button>
-          <div className="flex flex-1 justify-end">
-            <RoleSwitch />
-          </div>
         </header>
 
         <main className="flex-1 overflow-y-auto">

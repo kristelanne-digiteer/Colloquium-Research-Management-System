@@ -1,17 +1,37 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LogOut, Moon, Sun, Bell, Mail as MailIcon, User, Building2, Briefcase } from 'lucide-react';
+import {
+  LogOut,
+  Moon,
+  Sun,
+  Bell,
+  Mail as MailIcon,
+  User,
+  Building2,
+  BookOpen,
+  Phone,
+} from 'lucide-react';
 import FormInput from '../../components/common/formInput';
+import SelectField from '../../components/common/selectField';
+import ExpertiseTracks from '../../components/common/expertiseTracks';
 import Button from '../../components/common/button';
 import PhotoDropzone from '../../components/common/photoDropzone';
 import { useAuth } from '../../context/authContext';
 import { supabase } from '../../lib/supabaseClient';
+import { FIELD_OF_STUDY_GROUPS } from '../../lib/options';
 
 export default function AccountSettings() {
   const navigate = useNavigate();
   const { user, profile, updateProfile, signOut } = useAuth();
 
-  const [form, setForm] = useState({ fullName: '', bio: '', affiliation: '', workField: '' });
+  const [form, setForm] = useState({
+    name: '',
+    affiliation: '',
+    fieldOfStudy: '',
+    expertiseTracks: [''],
+    phoneNumber: '',
+    bio: '',
+  });
   const [avatarUrl, setAvatarUrl] = useState('');
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -28,12 +48,17 @@ export default function AccountSettings() {
   useEffect(() => {
     if (profile) {
       setForm({
-        fullName: profile.full_name || '',
-        bio: profile.bio || '',
+        name: profile.name || '',
         affiliation: profile.affiliation || '',
-        workField: profile.work_field || '',
+        fieldOfStudy: profile.field_of_study || '',
+        expertiseTracks:
+          Array.isArray(profile.expertise_tracks) && profile.expertise_tracks.length > 0
+            ? profile.expertise_tracks
+            : [''],
+        phoneNumber: profile.phone_number || '',
+        bio: profile.bio || '',
       });
-      setAvatarUrl(profile.avatar_url || '');
+      setAvatarUrl(profile.profile_photo_url || '');
       if (profile.notification_preferences) {
         setNotifications((prev) => ({ ...prev, ...profile.notification_preferences }));
       }
@@ -66,7 +91,7 @@ export default function AccountSettings() {
 
     const { data: publicUrlData } = supabase.storage.from('avatars').getPublicUrl(filePath);
     setAvatarUrl(publicUrlData.publicUrl);
-    await updateProfile({ avatar_url: publicUrlData.publicUrl });
+    await updateProfile({ profile_photo_url: publicUrlData.publicUrl });
     setUploading(false);
     setSaveMessage('Profile photo updated.');
   };
@@ -76,10 +101,12 @@ export default function AccountSettings() {
     setSaving(true);
     setSaveMessage('');
     const { error } = await updateProfile({
-      full_name: form.fullName,
-      bio: form.bio,
+      name: form.name,
       affiliation: form.affiliation,
-      work_field: form.workField,
+      field_of_study: form.fieldOfStudy,
+      expertise_tracks: form.expertiseTracks.map((t) => t.trim()).filter(Boolean),
+      phone_number: form.phoneNumber,
+      bio: form.bio,
     });
     setSaving(false);
     setSaveMessage(error ? error.message : 'Profile saved successfully.');
@@ -121,10 +148,10 @@ export default function AccountSettings() {
         <form onSubmit={handleSaveProfile} className="mt-6 space-y-4">
           <FormInput
             label="Full name"
-            name="fullName"
+            name="name"
             icon={User}
-            value={form.fullName}
-            onChange={(e) => setForm((p) => ({ ...p, fullName: e.target.value }))}
+            value={form.name}
+            onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
           />
           <FormInput
             label="Professional affiliation"
@@ -133,13 +160,32 @@ export default function AccountSettings() {
             value={form.affiliation}
             onChange={(e) => setForm((p) => ({ ...p, affiliation: e.target.value }))}
           />
-          <FormInput
-            label="Field of work"
-            name="workField"
-            icon={Briefcase}
-            value={form.workField}
-            onChange={(e) => setForm((p) => ({ ...p, workField: e.target.value }))}
+          <SelectField
+            label="Field of study"
+            name="fieldOfStudy"
+            icon={BookOpen}
+            value={form.fieldOfStudy}
+            onChange={(e) => setForm((p) => ({ ...p, fieldOfStudy: e.target.value }))}
+            groups={FIELD_OF_STUDY_GROUPS}
+            placeholder="Select your field of study"
           />
+
+          <ExpertiseTracks
+            value={form.expertiseTracks}
+            onChange={(next) => setForm((p) => ({ ...p, expertiseTracks: next }))}
+          />
+
+          <FormInput
+            label="Phone number"
+            name="phoneNumber"
+            type="tel"
+            icon={Phone}
+            placeholder="+63 9XX XXX XXXX"
+            value={form.phoneNumber}
+            onChange={(e) => setForm((p) => ({ ...p, phoneNumber: e.target.value }))}
+            autoComplete="tel"
+          />
+
           <div>
             <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">
               Bio

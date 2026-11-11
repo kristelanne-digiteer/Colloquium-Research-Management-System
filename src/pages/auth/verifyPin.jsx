@@ -21,6 +21,7 @@ export default function VerifyPin() {
 
   const email = location.state?.email;
   const photoFile = location.state?.photoFile;
+  const expertiseTracks = location.state?.expertiseTracks;
 
 
   const [pin, setPin] = useState('');
@@ -84,9 +85,15 @@ export default function VerifyPin() {
           .upload(filePath, photoFile, { upsert: true });
         if (!uploadError) {
           const { data: publicUrlData } = supabase.storage.from('avatars').getPublicUrl(filePath);
-          await updateProfile({ avatar_url: publicUrlData.publicUrl });
+          await updateProfile({ profile_photo_url: publicUrlData.publicUrl });
         }
       }
+    }
+
+
+    // Save the expertise tracks picked on the sign-up form
+    if (expertiseTracks?.length) {
+      await updateProfile({ expertise_tracks: expertiseTracks });
     }
 
 
@@ -165,4 +172,3 @@ export default function VerifyPin() {
     </AuthLayout>
   );
 }
-
