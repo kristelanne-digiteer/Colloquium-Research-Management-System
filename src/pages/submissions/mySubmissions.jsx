@@ -200,7 +200,7 @@ export default function MySubmissions() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-[#D2C1B6]/30">
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-[#1B3C53] tracking-tight">
-            Author Tracking Dashboard
+            My Submissions
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-1">
             Track the status of your submitted papers and view their review progress.

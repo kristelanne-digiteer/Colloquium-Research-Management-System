@@ -3,7 +3,6 @@ import {
   GraduationCap,
   LayoutDashboard,
   FileText,
-  FileCheck,
   ClipboardCheck,
   Bell,
   Settings,
@@ -14,7 +13,6 @@ import { useAuth } from '../../context/authContext';
 const navItems = [
   { to: '/overview', label: 'Overview', icon: LayoutDashboard },
   { to: '/submissions', label: 'My Submissions', icon: FileText },
-  { to: '/author-tracking', label: 'Feedback & Revision', icon: FileCheck },
   { to: '/review-assignments', label: 'Review Assignments', icon: ClipboardCheck },
   { to: '/notifications', label: 'Notifications', icon: Bell },
   { to: '/account-settings', label: 'Account Settings', icon: Settings },
