@@ -57,9 +57,9 @@ export default function MySubmissions() {
       borderClass: 'border-l-emerald-500',
       badgeClass: 'bg-emerald-100 text-emerald-800 border-emerald-200',
       reviews: [
-        { reviewer: 'Reviewer 1', status: 'Approved', rating: '5/5', comments: 'Excellent hardware methodology and empirical data.' },
-        { reviewer: 'Reviewer 2', status: 'Approved', rating: '4.5/5', comments: 'Strong execution. Minor formatting requested.' },
-        { reviewer: 'Reviewer 3', status: 'Pending', rating: '—', comments: 'Awaiting final score input.' }
+        { reviewer: 'Reviewer 1', status: 'Approved', rating: '5/5', comments: 'Excellent hardware methodology and empirical data.', accepted: true },
+        { reviewer: 'Reviewer 2', status: 'Approved', rating: '4.5/5', comments: 'Strong execution. Minor formatting requested.', accepted: true },
+        { reviewer: 'Reviewer 3', status: 'Pending', rating: '—', comments: 'Awaiting final score input.', accepted: true }
       ],
       abstract: 'This paper presents a smart footwear insole system engineered to harvest kinetic energy via piezoelectric elements. Test results indicate a 14% power conversion improvement suitable for micro-sensor networks.'
     },
@@ -69,16 +69,16 @@ export default function MySubmissions() {
       authors: ['Kristel Soriano', 'Juan Santos'],
       tags: ['Computer Engineering', 'Data Science'],
       submittedDate: 'Oct 20, 2026',
-      status: 'For Review',
+      status: 'Approved',
       reviewProgress: 1,
       totalReviews: 3,
       iconType: 'activity',
-      borderClass: 'border-l-amber-500',
-      badgeClass: 'bg-amber-100 text-amber-800 border-amber-200',
+      borderClass: 'border-l-emerald-500',
+      badgeClass: 'bg-emerald-100 text-emerald-800 border-emerald-200',
       reviews: [
-        { reviewer: 'Reviewer 1', status: 'Approved', rating: '4/5', comments: 'Well-structured dataset preprocessing.' },
-        { reviewer: 'Reviewer 2', status: 'Under Review', rating: '—', comments: 'Currently evaluating algorithm cross-validation.' },
-        { reviewer: 'Reviewer 3', status: 'Assigned', rating: '—', comments: 'Review invitation accepted.' }
+        { reviewer: 'Reviewer 1', status: 'Approved', rating: '4/5', comments: 'Well-structured dataset preprocessing.', accepted: true },
+        { reviewer: 'Reviewer 2', status: 'Approved', rating: '4/5', comments: 'Cross-validation looks solid.', accepted: true },
+        { reviewer: 'Reviewer 3', status: 'Approved', rating: '4.5/5', comments: 'Approved for publication track.', accepted: true }
       ],
       abstract: 'A comparative study of gradient boosting classifiers and deep neural networks in early detection of type-2 diabetes using demographic and biometric feature sets.'
     },
@@ -94,10 +94,12 @@ export default function MySubmissions() {
       iconType: 'code',
       borderClass: 'border-l-[#456882]',
       badgeClass: 'bg-[#456882]/15 text-[#1B3C53] border-[#456882]/30',
+      feedbackTimestamp: 'Nov 11, 2026 - 14:30',
+      resubmissionDeadline: 'Nov 25, 2026 - 23:59',
       reviews: [
-        { reviewer: 'Reviewer 1', status: 'Revision Requested', rating: '3/5', comments: 'Please clarify system architecture diagram and database indexing strategy.' },
-        { reviewer: 'Reviewer 2', status: 'Revision Requested', rating: '3.5/5', comments: 'Expand literature review on natural language processing routing.' },
-        { reviewer: 'Reviewer 3', status: 'Pending', rating: '—', comments: 'Awaiting resubmission upload.' }
+        { reviewer: 'Reviewer 1', status: 'Revision Requested', rating: '3/5', comments: 'Please clarify system architecture diagram and database indexing strategy.', accepted: false },
+        { reviewer: 'Reviewer 2', status: 'Revision Requested', rating: '3.5/5', comments: 'Expand literature review on natural language processing routing.', accepted: false },
+        { reviewer: 'Reviewer 3', status: 'Pending', rating: '—', comments: 'Awaiting resubmission upload.', accepted: false }
       ],
       abstract: 'An automated web architecture designed for scholarly conference tracking, smart paper-reviewer assignment heuristics, and real-time status telemetry.'
     }
@@ -105,14 +107,13 @@ export default function MySubmissions() {
 
   const [papers, setPapers] = useState(initialPapers);
 
-  // Dynamic Metrics counts
+  // Dynamic Metrics counts (Restricted to Approved, Declined, Resubmission)
   const metrics = useMemo(() => {
     return {
       total: papers.length,
       approved: papers.filter(p => p.status === 'Approved').length,
-      forReview: papers.filter(p => p.status === 'For Review').length,
-      resubmission: papers.filter(p => p.status === 'Resubmission').length,
-      rejected: papers.filter(p => p.status === 'Rejected').length
+      declined: papers.filter(p => p.status === 'Declined').length,
+      resubmission: papers.filter(p => p.status === 'Resubmission').length
     };
   }, [papers]);
 
@@ -157,16 +158,16 @@ export default function MySubmissions() {
       authors: ['Kristel Soriano'],
       tags: [newPaperCategory],
       submittedDate: 'Nov 7, 2026',
-      status: 'For Review',
-      reviewProgress: 0,
+      status: 'Approved',
+      reviewProgress: 3,
       totalReviews: 3,
       iconType: 'code',
-      borderClass: 'border-l-amber-500',
-      badgeClass: 'bg-amber-100 text-amber-800 border-amber-200',
+      borderClass: 'border-l-emerald-500',
+      badgeClass: 'bg-emerald-100 text-emerald-800 border-emerald-200',
       reviews: [
-        { reviewer: 'Reviewer 1', status: 'Assigned', rating: '—', comments: 'Awaiting initial evaluation.' },
-        { reviewer: 'Reviewer 2', status: 'Assigned', rating: '—', comments: 'Awaiting initial evaluation.' },
-        { reviewer: 'Reviewer 3', status: 'Assigned', rating: '—', comments: 'Awaiting initial evaluation.' }
+        { reviewer: 'Reviewer 1', status: 'Approved', rating: '4.5/5', comments: 'Initial review passed.', accepted: true },
+        { reviewer: 'Reviewer 2', status: 'Approved', rating: '4/5', comments: 'Acceptable formatting.', accepted: true },
+        { reviewer: 'Reviewer 3', status: 'Approved', rating: '5/5', comments: 'Good quality submission.', accepted: true }
       ],
       abstract: newPaperAbstract || 'No abstract summary provided.'
     };
@@ -359,7 +360,7 @@ export default function MySubmissions() {
       {/* TAB 2: AUTHOR TRACKING */}
       {activeSubTab === 'Author Tracking' && (
         <div className="space-y-6">
-          <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div
               onClick={() => setActiveTab('All Papers')}
               className={`bg-white rounded-2xl p-5 border shadow-sm transition-all duration-200 cursor-pointer hover:shadow-md ${
@@ -399,26 +400,6 @@ export default function MySubmissions() {
             </div>
 
             <div
-              onClick={() => setActiveTab('For Review')}
-              className={`bg-white rounded-2xl p-5 border shadow-sm transition-all duration-200 cursor-pointer hover:shadow-md ${
-                activeTab === 'For Review' ? 'border-amber-500 ring-2 ring-amber-500/10' : 'border-[#D2C1B6]/40'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">For Review</span>
-                <div className="p-2.5 bg-amber-50 text-amber-600 rounded-xl">
-                  <Clock className="w-5 h-5" />
-                </div>
-              </div>
-              <div className="mt-3 flex items-baseline justify-between">
-                <span className="text-3xl font-extrabold text-amber-600">{metrics.forReview}</span>
-                <span className="text-xs font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
-                  Peer Reviewing
-                </span>
-              </div>
-            </div>
-
-            <div
               onClick={() => setActiveTab('Resubmission')}
               className={`bg-white rounded-2xl p-5 border shadow-sm transition-all duration-200 cursor-pointer hover:shadow-md ${
                 activeTab === 'Resubmission' ? 'border-[#456882] ring-2 ring-[#456882]/10' : 'border-[#D2C1B6]/40'
@@ -444,9 +425,8 @@ export default function MySubmissions() {
               {[
                 { label: 'All Papers', count: metrics.total },
                 { label: 'Approved', count: metrics.approved },
-                { label: 'For Review', count: metrics.forReview },
                 { label: 'Resubmission', count: metrics.resubmission },
-                { label: 'Rejected', count: metrics.rejected },
+                { label: 'Declined', count: metrics.declined },
               ].map((tab) => {
                 const isActive = activeTab === tab.label;
                 return (
@@ -606,66 +586,124 @@ export default function MySubmissions() {
             <div>
               <h3 className="text-base font-bold text-[#1B3C53]">Reviewer Feedback & Manuscript Revision Portal</h3>
               <p className="text-xs text-slate-500 mt-0.5">
-                Select a paper to review evaluation comments and submit revised manuscript files.
+                Review evaluation comments from each reviewer, accept them individually, and submit your revised manuscript.
               </p>
             </div>
             <div className="px-3 py-1.5 bg-[#D2C1B6]/20 border border-[#D2C1B6]/50 rounded-xl text-xs font-bold text-[#1B3C53] flex items-center space-x-2">
               <AlertCircle className="w-4 h-4 text-[#456882]" />
-              <span>1 Paper Requires Revision</span>
+              <span>1 Paper Requires Resubmission</span>
             </div>
           </div>
 
-          {papers.map((paper) => (
-            <div key={paper.id} className="bg-white rounded-2xl p-6 border border-[#D2C1B6]/40 shadow-sm space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
-                <div>
-                  <span className="text-xs font-mono font-bold text-[#456882] bg-[#456882]/10 px-2 py-0.5 rounded">
-                    {paper.id}
-                  </span>
-                  <h4 className="text-sm font-bold text-[#1B3C53] mt-1">{paper.title}</h4>
-                </div>
-                <span className={`text-xs font-bold px-3 py-1 rounded-full border self-start sm:self-auto ${paper.badgeClass}`}>
-                  {paper.status}
-                </span>
-              </div>
+          {papers.map((paper) => {
+            const allReviewsAccepted = paper.reviews && paper.reviews.every(r => r.accepted);
 
-              <div className="space-y-3">
-                <h5 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Reviewer Scorecards & Comments</h5>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  {paper.reviews.map((rev, rIdx) => (
-                    <div key={rIdx} className="bg-[#F9F3EF] p-3.5 rounded-xl border border-[#D2C1B6]/40 text-xs space-y-1.5">
-                      <div className="flex justify-between font-bold text-[#1B3C53]">
-                        <span>{rev.reviewer}</span>
-                        <span className="text-[#456882]">{rev.rating}</span>
-                      </div>
-                      <p className="text-slate-600 italic text-[11px]">"{rev.comments}"</p>
+            return (
+              <div key={paper.id} className="bg-white rounded-2xl p-6 border border-[#D2C1B6]/40 shadow-sm space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <span className="text-xs font-mono font-bold text-[#456882] bg-[#456882]/10 px-2 py-0.5 rounded">
+                        {paper.id}
+                      </span>
+                      <span className="text-[11px] text-slate-400">
+                        Feedback Issued: {paper.feedbackTimestamp || 'Nov 11, 2026 - 14:30'}
+                      </span>
                     </div>
-                  ))}
+                    <h4 className="text-sm font-bold text-[#1B3C53] mt-1">{paper.title}</h4>
+                  </div>
+                  <span className={`text-xs font-bold px-3 py-1 rounded-full border self-start sm:self-auto ${paper.badgeClass}`}>
+                    {paper.status}
+                  </span>
                 </div>
-              </div>
 
-              {paper.status === 'Resubmission' && (
-                <div className="mt-4 pt-4 border-t border-dashed border-[#D2C1B6] bg-amber-50/50 p-4 rounded-xl space-y-3">
-                  <div className="flex items-center space-x-2 text-xs font-bold text-amber-800">
-                    <RotateCcw className="w-4 h-4 text-amber-600" />
-                    <span>Action Required: Upload Revised Manuscript Package</span>
+                <div className="space-y-3">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-1">
+                    <h5 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Reviewer Scorecards & Comments</h5>
+                    {paper.resubmissionDeadline && (
+                      <span className="text-xs font-semibold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200">
+                        Resubmission Deadline: {paper.resubmissionDeadline}
+                      </span>
+                    )}
                   </div>
-                  <div className="flex flex-col sm:flex-row items-center gap-3">
-                    <input
-                      type="file"
-                      className="text-xs text-slate-500 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-[#1B3C53] file:text-white hover:file:bg-[#456882] cursor-pointer"
-                    />
-                    <button
-                      onClick={() => alert(`Revised file uploaded for ${paper.id}`)}
-                      className="w-full sm:w-auto px-4 py-2 bg-[#456882] text-white text-xs font-bold rounded-xl hover:bg-[#1B3C53] transition-colors"
-                    >
-                      Submit Revision
-                    </button>
+                  
+                  {/* REVIEWER CARDS WITH INDIVIDUAL ACCEPT BUTTONS */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    {paper.reviews.map((rev, rIdx) => (
+                      <div key={rIdx} className="bg-[#F9F3EF] p-3.5 rounded-xl border border-[#D2C1B6]/40 text-xs flex flex-col justify-between space-y-3">
+                        <div className="space-y-1.5">
+                          <div className="flex justify-between font-bold text-[#1B3C53]">
+                            <span>{rev.reviewer}</span>
+                            <span className="text-[#456882]">{rev.rating}</span>
+                          </div>
+                          <p className="text-slate-600 italic text-[11px]">"{rev.comments}"</p>
+                        </div>
+
+                        <div className="pt-2 border-t border-[#D2C1B6]/30 flex items-center justify-between">
+                          <span className="text-[11px] font-semibold text-slate-500">Status:</span>
+                          {rev.accepted ? (
+                            <span className="text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 text-[11px]">
+                              ✓ Accepted
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => {
+                                const updatedPapers = papers.map(p => {
+                                  if (p.id === paper.id) {
+                                    const updatedReviews = [...p.reviews];
+                                    updatedReviews[rIdx] = { ...updatedReviews[rIdx], accepted: true };
+                                    return { ...p, reviews: updatedReviews };
+                                  }
+                                  return p;
+                                });
+                                setPapers(updatedPapers);
+                              }}
+                              className="px-2.5 py-1 bg-[#1B3C53] text-white font-bold rounded-lg hover:bg-[#456882] transition-colors text-[10px]"
+                            >
+                              Accept Comments
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              )}
-            </div>
-          ))}
+
+                {paper.status === 'Resubmission' && (
+                  <div className="mt-4 pt-4 border-t border-dashed border-[#D2C1B6] bg-amber-50/50 p-4 rounded-xl space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2 text-xs font-bold text-amber-800">
+                        <RotateCcw className="w-4 h-4 text-amber-600" />
+                        <span>
+                          {allReviewsAccepted 
+                            ? 'All comments have been accepted. You may now upload the revised package.' 
+                            : 'You must accept comments from all reviewers before you can resubmit.'}
+                        </span>
+                      </div>
+                      <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full ${allReviewsAccepted ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                        {allReviewsAccepted ? 'Ready for Upload' : 'Pending All Acceptances'}
+                      </span>
+                    </div>
+
+                    {allReviewsAccepted && (
+                      <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
+                        <input
+                          type="file"
+                          className="text-xs text-slate-500 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-[#1B3C53] file:text-white hover:file:bg-[#456882] cursor-pointer"
+                        />
+                        <button
+                          onClick={() => alert(`Revised file successfully uploaded for ${paper.id}`)}
+                          className="w-full sm:w-auto px-4 py-2 bg-[#456882] text-white text-xs font-bold rounded-xl hover:bg-[#1B3C53] transition-colors"
+                        >
+                          Submit Revision Package
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 
