@@ -5,6 +5,11 @@ const AuthContext = createContext(null);
 
 const DEV_BYPASS = import.meta.env.VITE_DEV_BYPASS_AUTH === 'true';
 
+// profiles.roles is a text[] (default {'AUTHOR'}). Anyone holding one of these
+// can open the EC Chair side; everybody else only ever sees the Author / Reviewer side.
+const ADMIN_ROLES = ['ADMIN', 'EC_CHAIR'];
+const ROLE_STORAGE_KEY = 'colloquium-active-role';
+
 const MOCK_USER = {
   id: 'dev-user-0001',
   email: 'dev.tester@colloquium.app',
@@ -17,6 +22,9 @@ const MOCK_PROFILE = {
   affiliation: 'Colloquium University',
   work_field: 'Computer Science',
   avatar_url: '',
+  // Dev preview: set VITE_DEV_BYPASS_ADMIN=true in .env to see the EC Chair tab.
+  roles: import.meta.env.VITE_DEV_BYPASS_ADMIN === 'true' ? ['AUTHOR', 'ADMIN'] : ['AUTHOR'],
+  expertise_tracks: [],
   notification_preferences: {
     email: true,
     submissionUpdates: true,
@@ -28,9 +36,16 @@ export function AuthProvider({ children }) {
   const [session, setSession] = useState(DEV_BYPASS ? { user: MOCK_USER } : null);
   const [profile, setProfile] = useState(DEV_BYPASS ? MOCK_PROFILE : null);
   const [loading, setLoading] = useState(!DEV_BYPASS);
-  const [activeRole, setActiveRoleState] = useState(
-    () => localStorage.getItem('colloquium-active-role') || 'author'
+  const [activeRoleState, setActiveRoleState] = useState(
+    () => localStorage.getItem(ROLE_STORAGE_KEY) || 'author'
   );
+
+  const isAdmin = useMemo(
+    () => (profile?.roles ?? []).some((r) => ADMIN_ROLES.includes(String(r).toUpperCase())),
+    [profile?.roles]
+  );
+  // Non-admins are always on the 'author' (Author / Reviewer) side, whatever is in localStorage.
+  const activeRole = isAdmin && activeRoleState === 'chair' ? 'chair' : 'author';
 
   useEffect(() => {
     if (DEV_BYPASS) return;
@@ -62,15 +77,18 @@ export function AuthProvider({ children }) {
 
     let isMounted = true;
 
-    supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', session.user.id)
-      .single()
-      .then(({ data, error }) => {
-        if (!isMounted) return;
-        if (!error) setProfile(data);
-      });
+    Promise.all([
+      supabase.from('profiles').select('*').eq('id', session.user.id).single(),
+      supabase.from('reviewer_tracks').select('track_code').eq('user_id', session.user.id),
+    ]).then(([profileRes, tracksRes]) => {
+      if (!isMounted) return;
+      if (!profileRes.error) {
+        setProfile({
+          ...profileRes.data,
+          expertise_tracks: (tracksRes.data ?? []).map((t) => t.track_code),
+        });
+      }
+    });
 
     return () => {
       isMounted = false;
@@ -79,7 +97,7 @@ export function AuthProvider({ children }) {
 
   const setActiveRole = (role) => {
     setActiveRoleState(role);
-    localStorage.setItem('colloquium-active-role', role);
+    localStorage.setItem(ROLE_STORAGE_KEY, role);
   };
 
   const signUp = async ({ email, password, fullName, affiliation, fieldOfStudy, phone }) => {
@@ -92,6 +110,7 @@ export function AuthProvider({ children }) {
           full_name: fullName,
           affiliation,
           field_of_study: fieldOfStudy,
+          work_field: fieldOfStudy,
           phone_number: phone,
         },
       },
@@ -154,14 +173,42 @@ export function AuthProvider({ children }) {
       return { data: { ...profile, ...updates }, error: null };
     }
     if (!session?.user) return { error: new Error('Not authenticated') };
-    const { data, error } = await supabase
-      .from('profiles')
-      .update(updates)
-      .eq('id', session.user.id)
-      .select()
-      .single();
-    if (!error) setProfile(data);
-    return { data, error };
+
+    // expertise_tracks is not a column on profiles; it lives in reviewer_tracks.
+    const { expertise_tracks, ...profileUpdates } = updates;
+
+    let data = profile;
+    if (Object.keys(profileUpdates).length > 0) {
+      const res = await supabase
+        .from('profiles')
+        .update(profileUpdates)
+        .eq('id', session.user.id)
+        .select()
+        .single();
+      if (res.error) return { data: null, error: res.error };
+      data = res.data;
+    }
+
+    let tracks = profile?.expertise_tracks ?? [];
+    if (Array.isArray(expertise_tracks)) {
+      const { error: tracksError } = await saveExpertiseTracks(session.user.id, expertise_tracks);
+      if (tracksError) return { data: null, error: tracksError };
+      tracks = expertise_tracks;
+    }
+
+    const next = { ...data, expertise_tracks: tracks };
+    setProfile(next);
+    return { data: next, error: null };
+  };
+
+  // Replace the user's reviewer_tracks rows with the given track codes.
+  const saveExpertiseTracks = async (userId, codes) => {
+    const { error: delError } = await supabase.from('reviewer_tracks').delete().eq('user_id', userId);
+    if (delError) return { error: delError };
+    if (codes.length === 0) return { error: null };
+    return supabase
+      .from('reviewer_tracks')
+      .insert(codes.map((track_code) => ({ user_id: userId, track_code })));
   };
 
   const signOut = async () => {
@@ -180,6 +227,7 @@ export function AuthProvider({ children }) {
       profile,
       loading,
       activeRole,
+      isAdmin,
       setActiveRole,
       signUp,
       signInWithPassword,
@@ -192,7 +240,7 @@ export function AuthProvider({ children }) {
       updateProfile,
       signOut,
     }),
-    [session, profile, loading, activeRole]
+    [session, profile, loading, activeRole, isAdmin]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

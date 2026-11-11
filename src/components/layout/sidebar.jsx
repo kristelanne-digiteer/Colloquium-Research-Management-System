@@ -7,6 +7,10 @@ import {
   Bell,
   Settings,
   LogOut,
+  Inbox,
+  Users,
+  FileSignature,
+  PieChart,
 } from 'lucide-react';
 import { useAuth } from '../../context/authContext';
 
@@ -18,17 +22,26 @@ const navItems = [
   { to: '/account-settings', label: 'Account Settings', icon: Settings },
 ];
 
+const chairNavItems = [
+  { to: '/chair/submissions', label: 'Submissions', icon: Inbox },
+  { to: '/chair/reviewers', label: 'Peer Reviewers', icon: Users },
+  { to: '/chair/letters', label: 'Formal Letters', icon: FileSignature },
+  { to: '/chair/reports', label: 'Reports', icon: PieChart },
+  { to: '/account-settings', label: 'Account Settings', icon: Settings },
+];
+
 export default function Sidebar({ onNavigate }) {
   const navigate = useNavigate();
-  const { user, profile, signOut } = useAuth();
+  const { user, profile, signOut, activeRole } = useAuth();
+  const items = activeRole === 'chair' ? chairNavItems : navItems;
 
   const handleLogout = async () => {
     await signOut();
     navigate('/login', { replace: true });
   };
 
-  const displayName = profile?.name || user?.email || 'Your account';
-  const initial = (profile?.name || user?.email || '?').charAt(0).toUpperCase();
+  const displayName = profile?.full_name || user?.email || 'Your account';
+  const initial = (profile?.full_name || user?.email || '?').charAt(0).toUpperCase();
 
   return (
     <aside className="flex h-full w-64 flex-shrink-0 flex-col border-r border-secondary-200/60 bg-primary-600 text-white dark:border-secondary-800">
@@ -40,7 +53,7 @@ export default function Sidebar({ onNavigate }) {
       </div>
 
       <nav className="flex-1 space-y-1 px-3">
-        {navItems.map(({ to, label, icon: Icon }) => (
+        {items.map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}
             to={to}
@@ -62,8 +75,8 @@ export default function Sidebar({ onNavigate }) {
       <div className="border-t border-white/10 px-3 py-4">
         <div className="flex items-center gap-3 rounded-xl px-2 py-2">
           <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center overflow-hidden rounded-full bg-white/15 text-sm font-bold">
-            {profile?.profile_photo_url ? (
-              <img src={profile.profile_photo_url} alt={displayName} referrerPolicy="no-referrer" className="h-full w-full object-cover" />
+            {profile?.avatar_url ? (
+              <img src={profile.avatar_url} alt={displayName} referrerPolicy="no-referrer" className="h-full w-full object-cover" />
             ) : (
               initial
             )}

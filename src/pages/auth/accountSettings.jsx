@@ -48,9 +48,9 @@ export default function AccountSettings() {
   useEffect(() => {
     if (profile) {
       setForm({
-        name: profile.name || '',
+        name: profile.full_name || '',
         affiliation: profile.affiliation || '',
-        fieldOfStudy: profile.field_of_study || '',
+        fieldOfStudy: profile.work_field || '',
         expertiseTracks:
           Array.isArray(profile.expertise_tracks) && profile.expertise_tracks.length > 0
             ? profile.expertise_tracks
@@ -58,7 +58,7 @@ export default function AccountSettings() {
         phoneNumber: profile.phone_number || '',
         bio: profile.bio || '',
       });
-      setAvatarUrl(profile.profile_photo_url || '');
+      setAvatarUrl(profile.avatar_url || '');
       if (profile.notification_preferences) {
         setNotifications((prev) => ({ ...prev, ...profile.notification_preferences }));
       }
@@ -91,7 +91,7 @@ export default function AccountSettings() {
 
     const { data: publicUrlData } = supabase.storage.from('avatars').getPublicUrl(filePath);
     setAvatarUrl(publicUrlData.publicUrl);
-    await updateProfile({ profile_photo_url: publicUrlData.publicUrl });
+    await updateProfile({ avatar_url: publicUrlData.publicUrl });
     setUploading(false);
     setSaveMessage('Profile photo updated.');
   };
@@ -101,9 +101,9 @@ export default function AccountSettings() {
     setSaving(true);
     setSaveMessage('');
     const { error } = await updateProfile({
-      name: form.name,
+      full_name: form.name,
       affiliation: form.affiliation,
-      field_of_study: form.fieldOfStudy,
+      work_field: form.fieldOfStudy,
       expertise_tracks: form.expertiseTracks.map((t) => t.trim()).filter(Boolean),
       phone_number: form.phoneNumber,
       bio: form.bio,

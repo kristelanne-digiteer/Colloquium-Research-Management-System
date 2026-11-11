@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/authContext';
 import ProtectedRoute from './routes/protectedRoutes';
+import ChairRoute from './routes/chairRoute';
 import AppLayout from './components/layout/appLayout';
 
 import SignUp from './pages/auth/signUp.jsx';
@@ -15,6 +16,10 @@ import MySubmissions from './pages/submissions/mySubmissions.jsx';
 import ReviewAssignments from './pages/review/reviewAssignments.jsx';
 import ReviewScreen from './pages/review/reviewscreen.jsx';
 import Notifications from './pages/notifications/notifications.jsx';
+import ChairSubmissions from './pages/chair/chairSubmissions.jsx';
+import ChairReviewers from './pages/chair/chairReviewers.jsx';
+import ChairLetters from './pages/chair/chairLetters.jsx';
+import ChairReports from './pages/chair/chairReports.jsx';
 
 export default function App() {
   return (
@@ -36,6 +41,13 @@ export default function App() {
               <Route path="/review-assignments/:id" element={<ReviewScreen />} />
               <Route path="/notifications" element={<Notifications />} />
               <Route path="/account-settings" element={<AccountSettings />} />
+              <Route element={<ChairRoute />}>
+                <Route path="/chair" element={<Navigate to="/chair/submissions" replace />} />
+                <Route path="/chair/submissions" element={<ChairSubmissions />} />
+                <Route path="/chair/reviewers" element={<ChairReviewers />} />
+                <Route path="/chair/letters" element={<ChairLetters />} />
+                <Route path="/chair/reports" element={<ChairReports />} />
+              </Route>
               <Route path="/" element={<Navigate to="/overview" replace />} />
             </Route>
           </Route>

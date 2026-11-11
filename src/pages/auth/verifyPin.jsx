@@ -85,7 +85,7 @@ export default function VerifyPin() {
           .upload(filePath, photoFile, { upsert: true });
         if (!uploadError) {
           const { data: publicUrlData } = supabase.storage.from('avatars').getPublicUrl(filePath);
-          await updateProfile({ profile_photo_url: publicUrlData.publicUrl });
+          await updateProfile({ avatar_url: publicUrlData.publicUrl });
         }
       }
     }
