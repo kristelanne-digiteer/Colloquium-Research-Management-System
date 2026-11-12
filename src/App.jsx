@@ -15,6 +15,7 @@ import AccountSettings from './pages/auth/accountSettings.jsx';
 import Overview from './pages/dashboard/overview.jsx';
 import MySubmissions from './pages/submissions/mySubmissions.jsx';
 import ReviewAssignments from './pages/review/reviewAssignments.jsx';
+import ReviewScreen from './pages/review/reviewscreen.jsx';
 import Notifications from './pages/notifications/notifications.jsx';
 import ChairSubmissions from './pages/chair/chairSubmissions.jsx';
 import ChairReviewers from './pages/chair/chairReviewers.jsx';
@@ -39,6 +40,7 @@ export default function App() {
               <Route path="/overview" element={<Overview />} />
               <Route path="/submissions" element={<MySubmissions />} />
               <Route path="/review-assignments" element={<ReviewAssignments />} />
+              <Route path="/review-assignments/:id" element={<ReviewScreen />} />
               <Route path="/notifications" element={<Notifications />} />
               <Route path="/account-settings" element={<AccountSettings />} />
               <Route element={<ChairRoute />}>
