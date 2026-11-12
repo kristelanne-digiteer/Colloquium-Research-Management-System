@@ -3,7 +3,7 @@
 // DB status -> label used on the EC Chair side (StatusBadge)
 export function chairStatus(dbStatus, revisionDeadline = null) {
   const s = String(dbStatus || '').toUpperCase();
-  if (s === 'ACCEPTED' || s === 'APPROVED') return 'Approved';
+  if (s.startsWith('ACCEPTED') || s.startsWith('ENDORSED') || s === 'APPROVED') return 'Approved';
   if (s === 'DECLINED' || s === 'REJECTED') return 'Rejected';
   if (revisionDeadline || s.includes('REVISION') || s.includes('RESUB')) return 'Resubmission';
   return 'For Review';

@@ -250,7 +250,7 @@ export function ChairProvider({ children }) {
     await pushNotification({
       user_id: paper.authorId,
       type: 'STATUS_CHANGED',
-      title: `Your paper was ${dbStatus === 'ACCEPTED' ? 'accepted' : 'declined'}`,
+      title: `Your paper was ${dbStatus === 'REJECTED' ? 'declined' : 'accepted'}`,
       message: `${paper.id}: ${paper.title}`,
       data: { submissionId: paper.dbId, trackingNumber: paper.id },
     });
@@ -258,8 +258,8 @@ export function ChairProvider({ children }) {
     await load();
   };
 
-  const approveSubmission = (paperId) => setDecision(paperId, 'ACCEPTED', `Submission ${paperId} has been approved.`);
-  const rejectSubmission = (paperId) => setDecision(paperId, 'DECLINED', `Submission ${paperId} marked as declined.`);
+  const approveSubmission = (paperId) => setDecision(paperId, 'ACCEPTED_FOR_PRESENTATION', `Submission ${paperId} has been approved.`);
+  const rejectSubmission = (paperId) => setDecision(paperId, 'REJECTED', `Submission ${paperId} marked as declined.`);
 
   // EC Chair grants / removes the REVIEWER role (profiles.roles). The database only allows
   // reviewer_assignments for users that hold this role.

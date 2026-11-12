@@ -26,7 +26,7 @@ export function clearLocalNotifications(email) {
 
 // Returns { ok, warning? }
 export async function sendLetterToAuthor({ letter, signatories, recipientEmail, paper, senderId }) {
-  const STATUS_FOR = { ACCEPTED: 'ACCEPTED', REJECTED: 'DECLINED' };
+  const STATUS_FOR = { ACCEPTED: 'ACCEPTED_FOR_PRESENTATION', REJECTED: 'REJECTED' };
   const note = {
     id: `local-${Date.now()}`,
     recipient_email: recipientEmail,

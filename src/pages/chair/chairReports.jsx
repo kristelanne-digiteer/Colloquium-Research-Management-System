@@ -1,7 +1,10 @@
+import { Download } from 'lucide-react';
 import { useChair } from '../../context/chairContext';
+import ChairButton from '../../components/chair/chairButton';
+import { downloadCsv } from '../../lib/exportCsv';
 
 export default function ChairReports() {
-  const { submissions, reviewers } = useChair();
+  const { submissions, reviewers, notify } = useChair();
 
   const stats = [
     { label: 'Total Submissions', value: submissions.length, note: 'All submitted papers', color: '' },
@@ -21,12 +24,58 @@ export default function ChairReports() {
     { label: 'Registered users', value: reviewers.length, color: '' },
   ];
 
+  // Generate a CSV: summary section first, then one row per submission.
+  const generateReport = () => {
+    if (!submissions.length) return notify('There are no submissions to include in a report yet.');
+
+    const now = new Date();
+    const rows = [
+      ['Colloquium - Committee Analytics & Reports'],
+      ['Generated', now.toLocaleString('en-US')],
+      [],
+      ['SUMMARY'],
+      ['Metric', 'Value'],
+      ...stats.map((s) => [s.label, s.value]),
+      ...metrics.map((m) => [m.label, m.value]),
+      [],
+      ['SUBMISSIONS'],
+      ['Tracking No.', 'Title', 'Author', 'Status', 'Review Round', 'Submitted', 'Assigned Reviewers', 'Reviews Submitted', 'Average Rating', 'Decisions'],
+      ...submissions.map((s) => {
+        const ratings = s.reviews.filter((r) => r.rating != null).map((r) => Number(r.rating));
+        const avg = ratings.length ? (ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(1) : '';
+        return [
+          s.id,
+          s.title,
+          s.author,
+          s.status,
+          s.reviewRound,
+          s.submittedAt,
+          s.assignments.map((a) => a.reviewerName).join('; '),
+          `${s.reviewsDone}/${s.reviewsTotal}`,
+          avg,
+          s.reviews.map((r) => `${r.reviewerName}: ${r.decision ?? '-'}`).join('; '),
+        ];
+      }),
+    ];
+
+    const stamp = now.toISOString().slice(0, 10);
+    downloadCsv(`colloquium-report-${stamp}.csv`, rows);
+    notify('Report generated. Check your downloads folder.');
+  };
+
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
-      <h1 className="text-2xl font-bold text-secondary-900 dark:text-white sm:text-3xl">Committee Analytics & Reports</h1>
-      <p className="mt-1 text-sm text-secondary-500 dark:text-secondary-400">
-        Monitor review velocity, consensus trends, and institutional compliance metrics.
-      </p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-secondary-900 dark:text-white sm:text-3xl">Committee Analytics & Reports</h1>
+          <p className="mt-1 text-sm text-secondary-500 dark:text-secondary-400">
+            Monitor review velocity, consensus trends, and institutional compliance metrics.
+          </p>
+        </div>
+        <ChairButton icon={Download} onClick={generateReport}>
+          Generate Report (CSV)
+        </ChairButton>
+      </div>
 
       <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {stats.map((s) => (
