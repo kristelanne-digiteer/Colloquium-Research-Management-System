@@ -2,6 +2,8 @@ import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { supabase, isBackendConfigured } from '../../lib/supabaseClient';
 import { useAuth } from '../../context/authContext';
 import { authorStatus, decisionLabel, fmtDate } from '../../lib/db';
+import PaperManage from '../../components/common/paperManage';
+import ReviewSheetModal from '../../components/common/reviewSheetModal';
 import {
   FileText,
   Search,
@@ -51,6 +53,7 @@ export default function MySubmissions() {
 
   const { user, profile } = useAuth();
   const [papers, setPapers] = useState([]);
+  const [sheet, setSheet] = useState(null);
   const [tracks, setTracks] = useState([]);
   const [submitError, setSubmitError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -66,14 +69,16 @@ export default function MySubmissions() {
   // Load this author's own submissions + the reviews on them (live)
   const loadPapers = useCallback(async () => {
     if (!isBackendConfigured || !user) return;
-    const [subs, revs] = await Promise.all([
+    const [subs, revs, who] = await Promise.all([
       supabase.from('submissions').select('*').eq('author_id', user.id).order('created_at', { ascending: false }),
       supabase.from('reviews').select('*'),
+      supabase.rpc('my_review_reviewers'),
     ]);
     if (subs.error) return;
+    const reviewerName = Object.fromEntries((who.data ?? []).map((w) => [w.reviewer_id, w.full_name]));
     setPapers(
       subs.data.map((r) => {
-        const status = authorStatus(r.status);
+        const status = authorStatus(r.status, r.revision_deadline);
         const myReviews = (revs.data ?? []).filter((x) => x.submission_id === r.id && x.review_round === r.review_round);
         const [border, badge] = STYLE[status];
         const names = (r.co_authors ?? []).map((c) => c.name).filter(Boolean);
@@ -85,17 +90,27 @@ export default function MySubmissions() {
           tags: r.keywords?.length ? r.keywords : r.track_sector ? [r.track_sector] : [],
           submittedDate: fmtDate(r.created_at),
           status,
+          revisionDeadline: r.revision_deadline,
+          reviewRound: r.review_round,
           reviewProgress: myReviews.length,
           totalReviews: Math.max(myReviews.length, 1),
           iconType: 'file',
           borderClass: border,
           badgeClass: badge,
-          reviews: myReviews.map((x, n) => ({
-            reviewer: `Reviewer ${n + 1}`,
+          reviews: (revs.data ?? []).filter((x) => x.submission_id === r.id).map((x, n) => ({
+            reviewer: `${reviewerName[x.reviewer_id] || `Reviewer ${n + 1}`}${r.review_round > 1 ? ` (round ${x.review_round})` : ''}`,
             status: decisionLabel(x.decision),
-            rating: x.rating != null ? `${x.rating}/5` : '—',
+            rating: x.rating != null ? `${x.rating}/5` : null,
             comments: x.comments_summary || '',
             accepted: x.decision === 'APPROVED',
+            sheet: {
+              decision: x.decision,
+              comments: x.comments_summary,
+              letter: x.feedback_letter?.letter ?? null,
+              signatories: x.feedback_letter?.signatories ?? null,
+              createdAt: x.created_at,
+              reviewerName: reviewerName[x.reviewer_id] || `Reviewer ${n + 1}`,
+            },
           })),
           abstract: r.abstract,
         };
@@ -820,7 +835,7 @@ export default function MySubmissions() {
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <h4 className="text-xs font-semibold uppercase tracking-wider text-black">
-                    Peer Review Reports ({selectedPaper.reviewProgress}/3)
+                    Peer Review Reports ({selectedPaper.reviewProgress})
                   </h4>
                   <span className="text-xs font-semibold text-[#456882]">Detailed Telemetry</span>
                 </div>
@@ -832,7 +847,7 @@ export default function MySubmissions() {
                         <span className="font-semibold text-black">{rev.reviewer}</span>
                         <div className="flex items-center space-x-2">
                           {/* Rating: lalabas lang kapag HINDI "For Review" */}
-                          {selectedPaper.status !== 'For Review' && rev.rating && (
+                          {rev.rating && (
                             <span className="text-slate-400">Rating: <strong className="text-slate-700">{rev.rating}</strong></span>
                           )}
                           <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#456882]/10 text-[#456882]">
@@ -842,13 +857,24 @@ export default function MySubmissions() {
                       </div>
                       
                       {/* Comments/Feedback: lalabas lang kapag HINDI "For Review" */}
-                      {selectedPaper.status !== 'For Review' && rev.comments && (
-                        <p className="text-xs text-slate-600 italic">"{rev.comments}"</p>
+                      {rev.comments && (
+                        <p className="line-clamp-3 whitespace-pre-wrap text-xs text-slate-600 italic">"{rev.comments}"</p>
                       )}
+                      <button type="button" onClick={() => setSheet(rev.sheet)} className="text-[11px] font-bold text-[#456882] hover:underline">
+                        View review sheet (PDF)
+                      </button>
                     </div>
                   ))}
                 </div>
               </div>
+
+              <PaperManage
+                key={selectedPaper.dbId}
+                paper={selectedPaper}
+                authorId={user.id}
+                onChanged={async () => { await loadPapers(); setSelectedPaper(null); }}
+                onDeleted={async () => { setSelectedPaper(null); await loadPapers(); }}
+              />
             </div>
 
             {/* Modal Footer with View Notice Button */}
@@ -869,6 +895,10 @@ export default function MySubmissions() {
             </div>
           </div>
         </div>
+      )}
+
+      {sheet && selectedPaper && (
+        <ReviewSheetModal review={sheet} trackingNumber={selectedPaper.id} title={selectedPaper.title} onClose={() => setSheet(null)} />
       )}
 
       {/* PDF / NOTICE PREVIEWER MODAL */}

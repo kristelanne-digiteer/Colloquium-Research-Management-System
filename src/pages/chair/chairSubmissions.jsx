@@ -22,7 +22,7 @@ function Keywords({ list }) {
 }
 
 export default function ChairSubmissions() {
-  const { submissions, approveSubmission, rejectSubmission, loading, loadError } = useChair();
+  const { submissions, approveSubmission, rejectSubmission, requestRevision, loading, loadError } = useChair();
   const [view, setView] = useState('card');
   const [query, setQuery] = useState('');
   const [assignId, setAssignId] = useState(null);
@@ -42,6 +42,10 @@ export default function ChairSubmissions() {
     { label: 'Assign Reviewer', icon: UserPlus, onClick: () => setAssignId(p.id) },
     { label: 'Reviewer scores', icon: ClipboardList, onClick: () => setScoresId(p.id) },
     { label: 'Write decision letter', icon: FileSignature, onClick: () => openLetter(p.id, p.status === 'Rejected' ? 'REJECTED' : p.status === 'Resubmission' ? 'REVISIONS' : 'ACCEPTED') },
+    {
+      label: 'Request revision', icon: ClipboardList,
+      onClick: () => window.confirm(`Ask the author of ${p.id} to revise and resubmit (14 days)?`) && requestRevision(p.id),
+    },
     { divider: true },
     {
       label: 'Approve Submission', icon: CheckCircle2, tone: 'success',

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Eye, Plus } from 'lucide-react';
+import { Eye, Plus, Trash2 } from 'lucide-react';
 import { useChair } from '../../context/chairContext';
 import ChairButton from '../../components/chair/chairButton';
 import LetterEditor from '../../components/chair/letterEditor';
@@ -11,7 +11,7 @@ const statusStyle = {
 };
 
 export default function ChairLetters() {
-  const { letters, submissions } = useChair();
+  const { letters, submissions, deleteLetter } = useChair();
   const [open, setOpen] = useState(null); // { paperId, template }
   const [newPaper, setNewPaper] = useState('');
   const [newTemplate, setNewTemplate] = useState('ACCEPTED');
@@ -57,6 +57,9 @@ export default function ChairLetters() {
             </tr>
           </thead>
           <tbody className="divide-y divide-secondary-100 dark:divide-secondary-800">
+            {letters.length === 0 && (
+              <tr><td colSpan={7} className="px-4 py-10 text-center text-sm text-secondary-500">No letters yet. Create one above.</td></tr>
+            )}
             {letters.map((l) => (
               <tr key={l.id}>
                 <td className="px-4 py-3 font-bold text-secondary-900 dark:text-white">{l.id}</td>
@@ -68,9 +71,14 @@ export default function ChairLetters() {
                   <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${statusStyle[l.status ?? 'Sent']}`}>{l.status ?? 'Sent'}</span>
                 </td>
                 <td className="px-4 py-3 text-right">
-                  <ChairButton size="sm" variant="secondary" icon={Eye} onClick={() => setOpen({ paperId: l.trackingId, template: templateFor(l.type) })}>
-                    Open
-                  </ChairButton>
+                  <div className="flex justify-end gap-2">
+                    <ChairButton size="sm" variant="secondary" icon={Eye} onClick={() => setOpen({ paperId: l.trackingId, template: templateFor(l.type) })}>
+                      Open
+                    </ChairButton>
+                    <ChairButton size="sm" variant="secondary" icon={Trash2} onClick={() => window.confirm(`Delete letter record ${l.id}?`) && deleteLetter(l)}>
+                      Delete
+                    </ChairButton>
+                  </div>
                 </td>
               </tr>
             ))}

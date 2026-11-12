@@ -15,6 +15,15 @@ export function getLocalLetterNotifications(email) {
   return readLocal().filter((n) => n.recipient_email?.toLowerCase() === e);
 }
 
+export function removeLocalNotification(id) {
+  try { localStorage.setItem(KEY, JSON.stringify(readLocal().filter((n) => n.id !== id))); } catch { /* ignore */ }
+}
+
+export function clearLocalNotifications(email) {
+  const e = (email || '').toLowerCase();
+  try { localStorage.setItem(KEY, JSON.stringify(readLocal().filter((n) => n.recipient_email?.toLowerCase() !== e))); } catch { /* ignore */ }
+}
+
 // Returns { ok, warning? }
 export async function sendLetterToAuthor({ letter, signatories, recipientEmail, paper, senderId }) {
   const STATUS_FOR = { ACCEPTED: 'ACCEPTED', REJECTED: 'DECLINED' };
@@ -58,6 +67,9 @@ export async function sendLetterToAuthor({ letter, signatories, recipientEmail, 
   });
   if (error) return { ok: false, error: error.message };
 
+  if (paper.dbId && letter.template === 'REVISIONS') {
+    await supabase.from('submissions').update({ revision_deadline: new Date(Date.now() + 14 * 86400000).toISOString(), updated_at: new Date().toISOString() }).eq('id', paper.dbId);
+  }
   if (paper.dbId && STATUS_FOR[letter.template]) {
     await supabase.from('submissions').update({ status: STATUS_FOR[letter.template], updated_at: new Date().toISOString() }).eq('id', paper.dbId);
   }

@@ -79,7 +79,9 @@ export function ChairProvider({ children }) {
         keywords: s.keywords?.length ? s.keywords : s.track_sector ? [s.track_sector] : [],
         author: nameOf[s.author_id] || 'Unknown author',
         authorId: s.author_id,
-        status: chairStatus(s.status),
+        status: chairStatus(s.status, s.revision_deadline),
+        revisionDeadline: s.revision_deadline,
+        reviewRound: s.review_round,
         dbStatus: s.status,
         submittedAt: fmtDate(s.created_at),
         reviewsDone: revs.length,
@@ -98,6 +100,9 @@ export function ChairProvider({ children }) {
           decision: r.decision,
           rating: r.rating,
           comments: r.comments_summary,
+          letter: r.feedback_letter?.letter ?? null,
+          signatories: r.feedback_letter?.signatories ?? null,
+          createdAt: r.created_at,
         })),
       };
     });
@@ -198,6 +203,45 @@ export function ChairProvider({ children }) {
     return true;
   };
 
+  // Remove a reviewer from a paper (their submitted review, if any, is kept).
+  const unassignReviewer = async (assignmentId) => {
+    const { data, error } = await supabase.from('reviewer_assignments').delete().eq('id', assignmentId).select('id');
+    if (error) return notify(`Could not remove assignment: ${error.message}`);
+    if (!data?.length) return notify('Could not remove the assignment (blocked by the database).');
+    notify('Reviewer removed from this paper.');
+    await load();
+  };
+
+  // Delete a letter: drafts live only in this session, sent ones are rows in public.letters.
+  const deleteLetter = async (letter) => {
+    if (String(letter.id).startsWith('DRAFT-')) {
+      setLetters((prev) => prev.filter((l) => l.id !== letter.id));
+      return;
+    }
+    const { error } = await supabase.from('letters').delete().eq('reference_code', letter.id);
+    if (error) return notify(`Could not delete the letter record: ${error.message}`);
+    notify('Letter record deleted.');
+    await load();
+  };
+
+  // Open the paper for revision: the author can then replace the file and resubmit (same submission).
+  const requestRevision = async (paperId, days = 14) => {
+    const paper = submissions.find((p) => p.id === paperId);
+    if (!paper) return;
+    const due = new Date(Date.now() + days * 86400000).toISOString();
+    const { error } = await supabase.from('submissions').update({ revision_deadline: due, updated_at: new Date().toISOString() }).eq('id', paper.dbId);
+    if (error) return notify(`Could not request a revision: ${error.message}`);
+    await pushNotification({
+      user_id: paper.authorId,
+      type: 'REVISION_REQUESTED',
+      title: 'Revisions requested for your paper',
+      message: `${paper.id}: replace your file and resubmit by ${fmtDate(due)}.`,
+      data: { submissionId: paper.dbId, trackingNumber: paper.id },
+    });
+    notify(`Revision requested for ${paper.id}. The author can now replace the file and resubmit.`);
+    await load();
+  };
+
   const setDecision = async (paperId, dbStatus, message) => {
     const paper = submissions.find((p) => p.id === paperId);
     if (!paper) return;
@@ -266,7 +310,7 @@ export function ChairProvider({ children }) {
   const value = useMemo(
     () => ({
       submissions, reviewers, letters, signatories, chairName, loading, loadError, userId: user?.id,
-      notify, assignReviewer, setReviewerRole, approveSubmission, rejectSubmission, saveSignatory, logLetter, reload: load,
+      notify, assignReviewer, requestRevision, unassignReviewer, deleteLetter, setReviewerRole, approveSubmission, rejectSubmission, saveSignatory, logLetter, reload: load,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [submissions, reviewers, letters, signatories, chairName, loading, loadError]

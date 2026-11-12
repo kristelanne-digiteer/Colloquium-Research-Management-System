@@ -1,25 +1,17 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ClipboardCheck, Star, X } from 'lucide-react';
+import { ClipboardCheck } from 'lucide-react';
 import { supabase, isBackendConfigured } from '../../lib/supabaseClient';
 import { useAuth } from '../../context/authContext';
-import { DECISIONS, decisionLabel, fmtDate } from '../../lib/db';
-
-const input =
-  'w-full rounded-lg border border-secondary-300 bg-white px-3 py-2 text-sm text-secondary-900 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/40 dark:border-secondary-700 dark:bg-secondary-800 dark:text-white';
+import { decisionLabel, fmtDate } from '../../lib/db';
+import ReviewFeedbackEditor from '../../components/common/reviewFeedbackEditor';
 
 // Papers explicitly assigned to the logged-in user by the EC Chair, plus the review scorecard.
 export default function ReviewAssignments() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [active, setActive] = useState(null); // row being reviewed
-  const [rating, setRating] = useState(0);
-  const [decision, setDecision] = useState('APPROVED');
-  const [comments, setComments] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [formError, setFormError] = useState('');
-
   const load = useCallback(async () => {
     if (!isBackendConfigured || !user) return setLoading(false);
     const { data: asg, error: e1 } = await supabase.from('reviewer_assignments').select('*').eq('reviewer_id', user.id).order('assigned_at', { ascending: false });
@@ -50,41 +42,32 @@ export default function ReviewAssignments() {
     return () => { supabase.removeChannel(channel); };
   }, [load, user]);
 
-  const openReview = (row) => {
-    setActive(row);
-    setRating(row.review?.rating ?? 0);
-    setDecision(row.review?.decision ?? 'APPROVED');
-    setComments(row.review?.comments_summary ?? '');
-    setFormError('');
-  };
-
-  const submit = async (e) => {
-    e.preventDefault();
-    if (!rating) return setFormError('Give the paper a rating from 1 to 5.');
-    if (!comments.trim()) return setFormError('Write your technical feedback for the EC Chair.');
-    setSaving(true);
-    setFormError('');
-    const { error: re } = await supabase.from('reviews').insert({
+  // Called by the editor. Returns an error message, or nothing on success.
+  const submitReview = async ({ decision, text, sheet }) => {
+    const row = {
       submission_id: active.submission_id,
       reviewer_id: user.id,
       stage: active.stage,
       decision,
-      rating,
-      comments_summary: comments.trim(),
+      comments_summary: text,
       review_round: active.sub?.review_round ?? 1,
-    });
-    if (re) {
-      setFormError(`Could not submit review: ${re.message}`);
-      return setSaving(false);
+      feedback_letter: sheet,
+    };
+    let { error: re } = await supabase.from('reviews').insert(row);
+    // Column missing (update3.sql not run yet): save the text only so the review is never lost.
+    if (re && /feedback_letter/.test(re.message)) {
+      delete row.feedback_letter;
+      ({ error: re } = await supabase.from('reviews').insert(row));
     }
+    if (re) return `Could not submit review: ${re.message}`;
+
     const { error: ae } = await supabase.from('reviewer_assignments').update({ assignment_status: 'COMPLETED' }).eq('id', active.id);
     // Tell the EC Chair(s). Best-effort: the review is already saved.
     await supabase.rpc('notify_admins', {
       p_title: 'Review submitted',
-      p_message: `${active.sub?.tracking_number ?? ''}: ${decisionLabel(decision)} (${rating}/5)`,
+      p_message: `${active.sub?.tracking_number ?? ''}: ${decisionLabel(decision)}`,
       p_data: { submissionId: active.submission_id },
     });
-    setSaving(false);
     if (ae) setError(`Review saved, but the assignment status was not updated: ${ae.message}`);
     setActive(null);
     load();
@@ -120,7 +103,7 @@ export default function ReviewAssignments() {
                     <span className={`rounded-full px-3 py-1 text-xs font-semibold ${done ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
                       {done ? 'Completed' : String(r.assignment_status).replace(/_/g, ' ')}
                     </span>
-                    <button type="button" onClick={() => openReview(r)} className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-700">
+                    <button type="button" onClick={() => setActive(r)} className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-700">
                       {done ? 'View my review' : 'Review paper'}
                     </button>
                   </div>
@@ -132,45 +115,13 @@ export default function ReviewAssignments() {
       )}
 
       {active && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setActive(null)} />
-          <form onSubmit={submit} className="relative max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl bg-white p-6 shadow-xl dark:bg-secondary-900">
-            <button type="button" aria-label="Close" onClick={() => setActive(null)} className="absolute right-3 top-3 rounded-lg p-1.5 text-secondary-400 hover:bg-secondary-100"><X className="h-4 w-4" /></button>
-            <p className="text-xs font-bold text-secondary-500">{active.sub?.tracking_number}</p>
-            <h2 className="mt-1 pr-8 text-lg font-bold text-secondary-900 dark:text-white">{active.sub?.title}</h2>
-            <p className="mt-3 max-h-40 overflow-y-auto whitespace-pre-wrap text-sm text-secondary-600 dark:text-secondary-300">{active.sub?.abstract}</p>
-
-            <fieldset disabled={Boolean(active.review) || saving} className="mt-5 space-y-4">
-              <div>
-                <span className="mb-1.5 block text-xs font-semibold text-secondary-500">Rating</span>
-                <div className="flex gap-1">
-                  {[1, 2, 3, 4, 5].map((n) => (
-                    <button key={n} type="button" aria-label={`${n} star${n > 1 ? 's' : ''}`} onClick={() => setRating(n)}>
-                      <Star className={`h-7 w-7 ${n <= rating ? 'fill-amber-400 text-amber-400' : 'text-secondary-300'}`} />
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <label htmlFor="rv-decision" className="mb-1.5 block text-xs font-semibold text-secondary-500">Recommendation</label>
-                <select id="rv-decision" className={input} value={decision} onChange={(e) => setDecision(e.target.value)}>
-                  {DECISIONS.map((d) => <option key={d.value} value={d.value}>{d.label}</option>)}
-                </select>
-              </div>
-              <div>
-                <label htmlFor="rv-comments" className="mb-1.5 block text-xs font-semibold text-secondary-500">Technical feedback (sent to the EC Chair)</label>
-                <textarea id="rv-comments" rows={6} className={input} value={comments} onChange={(e) => setComments(e.target.value)} placeholder="Originality, methodology, clarity, relevance..." />
-              </div>
-            </fieldset>
-
-            {formError && <p role="alert" className="mt-3 text-sm font-semibold text-red-600">{formError}</p>}
-            {!active.review && (
-              <button type="submit" disabled={saving} className="mt-5 w-full rounded-lg bg-primary-600 py-2.5 text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-60">
-                {saving ? 'Submitting...' : 'Submit review'}
-              </button>
-            )}
-          </form>
-        </div>
+        <ReviewFeedbackEditor
+          key={active.id}
+          assignment={active}
+          reviewerName={profile?.full_name || user?.email || 'Reviewer'}
+          onSubmit={submitReview}
+          onClose={() => setActive(null)}
+        />
       )}
     </div>
   );

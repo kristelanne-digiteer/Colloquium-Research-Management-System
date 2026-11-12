@@ -1,107 +1,99 @@
-<<<<<<< Updated upstream
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Bell, FileText, Printer, X } from 'lucide-react';
+import { Bell, CheckCheck, FileText, Printer, Trash2, X } from 'lucide-react';
 import { supabase, isBackendConfigured } from '../../lib/supabaseClient';
 import { useAuth } from '../../context/authContext';
-import { getLocalLetterNotifications } from '../../lib/letterStore';
+import { clearLocalNotifications, getLocalLetterNotifications, removeLocalNotification } from '../../lib/letterStore';
 import LetterPaper from '../../components/common/letterPaper';
 
 const when = (iso) => new Date(iso).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
+const isLocal = (n) => String(n.id).startsWith('local-');
 
+// Create (sent by the app) / Read / Update (mark read) / Delete (one or clear all).
 export default function Notifications() {
   const { user } = useAuth();
   const [items, setItems] = useState([]);
   const [viewing, setViewing] = useState(null);
+  const [error, setError] = useState('');
+
+  const load = useCallback(async () => {
+    if (!user) return;
+    const local = getLocalLetterNotifications(user.email);
+    if (!isBackendConfigured) return setItems(local);
+    const { data, error: e } = await supabase
+      .from('notifications')
+      .select('*')
+      .or(`user_id.eq.${user.id},recipient_email.eq.${user.email}`)
+      .order('created_at', { ascending: false });
+    if (e) setError(e.message);
+    // The same letter can exist as a local copy and a DB row: keep the DB row.
+    const keys = new Set((data ?? []).map((n) => n.title + n.message));
+    setItems([...(data ?? []), ...local.filter((n) => !keys.has(n.title + n.message))]);
+  }, [user]);
 
   useEffect(() => {
-    if (!user) return;
-    let alive = true;
-    const local = getLocalLetterNotifications(user.email);
-
-    const load = async () => {
-      if (!isBackendConfigured) return alive && setItems(local);
-      const { data } = await supabase
-        .from('notifications')
-        .select('*')
-        .or(`user_id.eq.${user.id},recipient_email.eq.${user.email}`)
-        .order('created_at', { ascending: false });
-      if (!alive) return;
-      // The same letter can exist as a local copy and a DB row: keep the DB row.
-      const keys = new Set((data ?? []).map((n) => n.title + n.message));
-      setItems([...(data ?? []), ...local.filter((n) => !keys.has(n.title + n.message))]);
-    };
     load();
-
-    if (!isBackendConfigured) return () => { alive = false; };
+    if (!isBackendConfigured || !user) return;
     // Live updates for assignments, submissions and decision letters
     const channel = supabase
       .channel(`notifications-${user.id}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` }, () => load())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` }, () => load())
       .subscribe();
-    return () => { alive = false; supabase.removeChannel(channel); };
-  }, [user]);
+    return () => { supabase.removeChannel(channel); };
+  }, [load, user]);
 
-  const open = async (n) => {
-    setViewing(n);
-    if (!n.is_read && isBackendConfigured && !String(n.id).startsWith('local-')) {
-      await supabase.from('notifications').update({ is_read: true }).eq('id', n.id);
-      setItems((prev) => prev.map((x) => (x.id === n.id ? { ...x, is_read: true } : x)));
-=======
-import React, { useState, useEffect } from 'react';
-import { Bell, CheckCircle2 } from 'lucide-react';
-import { supabase } from '../../lib/supabaseClient';
+  const markRead = async (n) => {
+    if (n.is_read) return;
+    setItems((prev) => prev.map((x) => (x.id === n.id ? { ...x, is_read: true } : x)));
+    if (isBackendConfigured && !isLocal(n)) await supabase.from('notifications').update({ is_read: true }).eq('id', n.id);
+  };
 
-export default function Notifications() {
-  const [notifications, setNotifications] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const markAllRead = async () => {
+    setItems((prev) => prev.map((x) => ({ ...x, is_read: true })));
+    if (isBackendConfigured) await supabase.from('notifications').update({ is_read: true }).eq('user_id', user.id).eq('is_read', false);
+  };
 
-  useEffect(() => {
-    fetchNotifications();
+  const remove = async (n) => {
+    setItems((prev) => prev.filter((x) => x.id !== n.id));
+    if (isLocal(n)) return removeLocalNotification(n.id);
+    const { error: e } = await supabase.from('notifications').delete().eq('id', n.id);
+    if (e) { setError(`Could not delete: ${e.message}`); load(); }
+  };
 
-    const channel = supabase
-      ?.channel('realtime_notifications')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, (payload) => {
-        setNotifications((prev) => [payload.new, ...prev]);
-      })
-      .subscribe();
-
-    return () => {
-      if (channel) supabase.removeChannel(channel);
-    };
-  }, []);
-
-  const fetchNotifications = async () => {
-    setLoading(true);
-    try {
-      if (supabase?.from) {
-        const { data: authData } = await supabase.auth.getUser();
-        const currentUser = authData?.user;
-
-        let query = supabase.from('notifications').select('*').order('created_at', { ascending: false });
-
-        if (currentUser) {
-          query = query.or(`user_id.eq.${currentUser.id},recipient_email.eq.${currentUser.email}`);
-        }
-
-        const { data, error } = await query;
-        if (!error && data) {
-          setNotifications(data);
-        }
-      }
-    } catch (err) {
-      console.error('Error fetching notifications:', err);
-    } finally {
-      setLoading(false);
->>>>>>> Stashed changes
+  const clearAll = async () => {
+    if (!window.confirm('Delete all notifications? This cannot be undone.')) return;
+    setItems([]);
+    clearLocalNotifications(user.email);
+    if (isBackendConfigured) {
+      const { error: e } = await supabase.from('notifications').delete().eq('user_id', user.id);
+      if (e) { setError(`Could not clear: ${e.message}`); load(); }
     }
   };
 
+  const unread = items.filter((n) => !n.is_read).length;
+
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6 sm:py-12">
-<<<<<<< Updated upstream
-      <h1 className="text-2xl font-bold text-secondary-900 dark:text-white sm:text-3xl">Notifications</h1>
-      <p className="mt-1 text-sm text-secondary-500 dark:text-secondary-400">Updates on your submissions and review activity.</p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-secondary-900 dark:text-white sm:text-3xl">Notifications</h1>
+          <p className="mt-1 text-sm text-secondary-500 dark:text-secondary-400">
+            Updates on your submissions and review activity. {unread > 0 ? `${unread} unread.` : ''}
+          </p>
+        </div>
+        {items.length > 0 && (
+          <div className="flex gap-2">
+            <button type="button" onClick={markAllRead} disabled={unread === 0} className="inline-flex items-center gap-1.5 rounded-lg border border-secondary-300 px-3 py-1.5 text-xs font-semibold text-secondary-700 hover:bg-secondary-50 disabled:opacity-50">
+              <CheckCheck className="h-4 w-4" /> Mark all read
+            </button>
+            <button type="button" onClick={clearAll} className="inline-flex items-center gap-1.5 rounded-lg border border-red-300 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50">
+              <Trash2 className="h-4 w-4" /> Clear all
+            </button>
+          </div>
+        )}
+      </div>
+
+      {error && <p role="alert" className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
 
       {items.length === 0 ? (
         <div className="mt-8 flex flex-col items-center justify-center rounded-2xl border border-dashed border-secondary-300 bg-white px-6 py-16 text-center dark:border-secondary-700 dark:bg-secondary-900">
@@ -109,61 +101,36 @@ export default function Notifications() {
           <p className="mt-4 text-sm font-medium text-secondary-600 dark:text-secondary-300">You&apos;re all caught up.</p>
         </div>
       ) : (
-        <ul className="mt-8 space-y-3">
+        <ul className="mt-6 space-y-3">
           {items.map((n) => (
             <li key={n.id} className={`flex items-start gap-3 rounded-2xl border bg-white p-4 dark:bg-secondary-900 ${n.is_read ? 'border-secondary-200 dark:border-secondary-800' : 'border-primary-300'}`}>
-              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-600">
+              <div className="relative flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-600">
                 {n.data?.letter ? <FileText className="h-5 w-5" /> : <Bell className="h-5 w-5" />}
+                {!n.is_read && <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-red-500" aria-label="Unread" />}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="font-semibold text-secondary-900 dark:text-white">{n.title}</p>
+                <p className={`text-secondary-900 dark:text-white ${n.is_read ? 'font-medium' : 'font-bold'}`}>{n.title}</p>
                 <p className="truncate text-sm text-secondary-500">{n.message}</p>
                 <p className="mt-1 text-xs text-secondary-400">{when(n.created_at)}</p>
               </div>
-              {n.data?.letter && (
-                <button type="button" onClick={() => open(n)} className="rounded-lg border border-primary-600 px-3 py-1.5 text-xs font-semibold text-primary-600 hover:bg-primary-50">
-                  View letter
+              <div className="flex flex-shrink-0 items-center gap-1">
+                {n.data?.letter && (
+                  <button type="button" onClick={() => { setViewing(n); markRead(n); }} className="rounded-lg border border-primary-600 px-3 py-1.5 text-xs font-semibold text-primary-600 hover:bg-primary-50">
+                    View letter
+                  </button>
+                )}
+                {!n.is_read && (
+                  <button type="button" onClick={() => markRead(n)} title="Mark as read" aria-label="Mark as read" className="rounded-lg p-2 text-secondary-400 hover:bg-secondary-100 hover:text-secondary-700">
+                    <CheckCheck className="h-4 w-4" />
+                  </button>
+                )}
+                <button type="button" onClick={() => remove(n)} title="Delete" aria-label="Delete notification" className="rounded-lg p-2 text-secondary-400 hover:bg-red-50 hover:text-red-600">
+                  <Trash2 className="h-4 w-4" />
                 </button>
-              )}
+              </div>
             </li>
-=======
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Notifications</h1>
-          <p className="mt-1 text-sm text-slate-500">Updates on your submissions, decision notices, and assigned reviews.</p>
-        </div>
-        <span className="text-xs font-semibold px-2.5 py-1 bg-[#1B3C53]/10 text-[#1B3C53] rounded-full">
-          {notifications.length} Total
-        </span>
-      </div>
-
-      {loading ? (
-        <div className="p-8 text-center text-xs text-slate-400">Loading notifications...</div>
-      ) : notifications.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center">
-          <Bell className="h-10 w-10 text-slate-300" />
-          <p className="mt-4 text-sm font-medium text-slate-600">You're all caught up.</p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {notifications.map((n) => (
-            <div key={n.id} className="p-4 bg-white rounded-2xl border shadow-sm flex items-start space-x-3.5">
-              <div className="p-2.5 bg-[#1B3C53] text-white rounded-xl shrink-0 mt-0.5">
-                <Bell className="h-4 w-4" />
-              </div>
-              <div className="flex-1 space-y-1">
-                <div className="flex justify-between items-center">
-                  <h4 className="text-sm font-bold text-slate-900">{n.title}</h4>
-                  <span className="text-[10px] text-slate-400 font-mono">
-                    {new Date(n.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </span>
-                </div>
-                <p className="text-xs text-slate-600 leading-relaxed">{n.message}</p>
-              </div>
-            </div>
->>>>>>> Stashed changes
           ))}
-        </div>
+        </ul>
       )}
 
       {viewing && createPortal(
