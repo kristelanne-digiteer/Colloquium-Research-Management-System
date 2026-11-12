@@ -3,6 +3,7 @@ import { AuthProvider } from './context/authContext';
 import ProtectedRoute from './routes/protectedRoutes';
 import ChairRoute from './routes/chairRoute';
 import AppLayout from './components/layout/appLayout';
+import AuthorSubmissionForm from './components/AuthorSubmissionForm';
 
 import SignUp from './pages/auth/signUp.jsx';
 import VerifyPin from './pages/auth/verifyPin.jsx';
@@ -14,7 +15,6 @@ import AccountSettings from './pages/auth/accountSettings.jsx';
 import Overview from './pages/dashboard/overview.jsx';
 import MySubmissions from './pages/submissions/mySubmissions.jsx';
 import ReviewAssignments from './pages/review/reviewAssignments.jsx';
-import ReviewScreen from './pages/review/reviewscreen.jsx';
 import Notifications from './pages/notifications/notifications.jsx';
 import ChairSubmissions from './pages/chair/chairSubmissions.jsx';
 import ChairReviewers from './pages/chair/chairReviewers.jsx';
@@ -32,13 +32,13 @@ export default function App() {
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-pin" element={<ResetPin />} />
           <Route path="/reset-success" element={<ResetSuccess />} />
+          <Route path="/author-submission" element={<AuthorSubmissionForm />} />
 
           <Route element={<ProtectedRoute />}>
             <Route element={<AppLayout />}>
               <Route path="/overview" element={<Overview />} />
               <Route path="/submissions" element={<MySubmissions />} />
               <Route path="/review-assignments" element={<ReviewAssignments />} />
-              <Route path="/review-assignments/:id" element={<ReviewScreen />} />
               <Route path="/notifications" element={<Notifications />} />
               <Route path="/account-settings" element={<AccountSettings />} />
               <Route element={<ChairRoute />}>

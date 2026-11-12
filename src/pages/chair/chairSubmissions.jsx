@@ -1,296 +1,176 @@
-import React, { useState, useEffect } from 'react';
-import { Eye, RefreshCw, Inbox, UserPlus, CheckCircle2, UserCheck, X } from 'lucide-react';
-import { supabase } from '../../lib/supabaseClient';
+import { useMemo, useState } from 'react';
+import {
+  Search, LayoutGrid, Table2, UserCheck, UserPlus, ClipboardList, FileSignature, CheckCircle2, Ban,
+} from 'lucide-react';
+import { useChair } from '../../context/chairContext';
+import StatusBadge from '../../components/chair/statusBadge';
+import ActionMenu from '../../components/chair/actionMenu';
+import AssignReviewerModal from '../../components/chair/assignReviewerModal';
+import ReviewScoresModal from '../../components/chair/reviewScoresModal';
 import LetterEditor from '../../components/chair/letterEditor';
 
+function Keywords({ list }) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {list.map((k) => (
+        <span key={k} className="rounded-md bg-accent-100 px-2 py-0.5 text-xs font-medium text-accent-600 dark:bg-accent-600/20 dark:text-accent-300">
+          {k}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 export default function ChairSubmissions() {
-  const [submissions, setSubmissions] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { submissions, approveSubmission, rejectSubmission, loading, loadError } = useChair();
+  const [view, setView] = useState('card');
+  const [query, setQuery] = useState('');
+  const [assignId, setAssignId] = useState(null);
+  const [scoresId, setScoresId] = useState(null);
+  const [doc, setDoc] = useState(null); // { paperId, type, date }
 
-  // Notice Editor Modal
-  const [activeLetterPaperId, setActiveLetterPaperId] = useState(null);
-  const [selectedPaperStatus, setSelectedPaperStatus] = useState('ACCEPTED');
-  const [selectedPaperAuthorEmail, setSelectedPaperAuthorEmail] = useState('');
-  const [selectedPaperAuthorId, setSelectedPaperAuthorId] = useState(null);
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return submissions.filter(
+      (s) => s.id.toLowerCase().includes(q) || s.title.toLowerCase().includes(q) || s.author.toLowerCase().includes(q)
+    );
+  }, [submissions, query]);
 
-  // Reviewer Assignment Modal State
-  const [assigningPaper, setAssigningPaper] = useState(null);
-  const [selectedReviewerId, setSelectedReviewerId] = useState('');
-  const [availableReviewers, setAvailableReviewers] = useState([]);
+  const openLetter = (paperId, template) => setDoc({ paperId, template });
 
-  useEffect(() => {
-    fetchSubmissions();
-    fetchReviewersDirectory();
+  const actionsFor = (p) => [
+    { label: 'Assign Reviewer', icon: UserPlus, onClick: () => setAssignId(p.id) },
+    { label: 'Reviewer scores', icon: ClipboardList, onClick: () => setScoresId(p.id) },
+    { label: 'Write decision letter', icon: FileSignature, onClick: () => openLetter(p.id, p.status === 'Rejected' ? 'REJECTED' : p.status === 'Resubmission' ? 'REVISIONS' : 'ACCEPTED') },
+    { divider: true },
+    {
+      label: 'Approve Submission', icon: CheckCircle2, tone: 'success',
+      onClick: () => window.confirm(`Officially APPROVE submission ${p.id}?`) && approveSubmission(p.id),
+    },
+    {
+      label: 'Reject Submission', icon: Ban, tone: 'danger',
+      onClick: () => window.confirm(`Mark ${p.id} as Rejected?`) && rejectSubmission(p.id),
+    },
+  ];
 
-    const channel = supabase
-      ?.channel('realtime_chair_submissions')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'submissions' }, () => fetchSubmissions())
-      .subscribe();
-
-    return () => {
-      if (channel) supabase.removeChannel(channel);
-    };
-  }, []);
-
-  // Kunin ang listahan ng reviewers mula sa DB o Peer Reviewers Roster
-  const fetchReviewersDirectory = async () => {
-    try {
-      if (supabase?.from) {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('id, full_name, work_field, affiliation');
-
-        if (!error && data && data.length > 0) {
-          setAvailableReviewers(data);
-        } else {
-          // Listahan mula sa inyong Peer Reviewers Roster UI
-          setAvailableReviewers([
-            { id: 'prof-001', full_name: 'Prof. Sarah Jenkins', work_field: 'Biomedical Ethics' },
-            { id: 'prof-002', full_name: 'Dr. Robert Chen', work_field: 'Clinical Trials & AI' },
-            { id: 'prof-003', full_name: 'Dr. Amara Okezie', work_field: 'Genomics & CRISPR' },
-            { id: 'prof-004', full_name: 'Prof. David Vance', work_field: 'Neuroethics & BCI' }
-          ]);
-        }
-      }
-    } catch (e) {
-      console.error('Error fetching reviewer roster:', e);
-    }
-  };
-
-  // Kunin ang lahat ng submissions live
-  const fetchSubmissions = async () => {
-    setLoading(true);
-    try {
-      if (supabase?.from) {
-        const { data: subsData, error } = await supabase
-          .from('submissions')
-          .select(`
-            *,
-            reviewer_assignments (*),
-            reviews (*)
-          `)
-          .order('created_at', { ascending: false });
-
-        if (!error && subsData) {
-          setSubmissions(subsData);
-        } else {
-          setSubmissions([]);
-        }
-      }
-    } catch (err) {
-      console.error('Error fetching submissions for chair:', err);
-      setSubmissions([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // EC Chair assigns reviewer (walang blocking missing track error!)
-  const handleAssignReviewer = async () => {
-    if (!assigningPaper || !selectedReviewerId) {
-      alert('Pumili ng Reviewer mula sa listahan.');
-      return;
-    }
-
-    const chosenProf = availableReviewers.find(r => r.id === selectedReviewerId);
-
-    try {
-      if (supabase?.from) {
-        // Siguraduhing may track_sector ang submission para sa relational integrity
-        if (!assigningPaper.track_sector) {
-          await supabase
-            .from('submissions')
-            .update({ track_sector: 'CS' })
-            .eq('id', assigningPaper.id);
-        }
-
-        // 1. I-insert sa reviewer_assignments table
-        const { error: asgnErr } = await supabase.from('reviewer_assignments').insert([{
-          submission_id: assigningPaper.id,
-          reviewer_id: selectedReviewerId.includes('-') ? selectedReviewerId : '00000000-0000-0000-0000-000000000000',
-          stage: assigningPaper.current_stage || 'STAGE_1_PRESENTATION',
-          assignment_status: 'PENDING',
-          assigned_at: new Date().toISOString()
-        }]);
-
-        if (asgnErr) console.warn('Assignment notice:', asgnErr.message);
-
-        // 2. Magpadala ng In-App notification sa Reviewer
-        await supabase.from('notifications').insert([{
-          user_id: selectedReviewerId.includes('-') ? selectedReviewerId : '00000000-0000-0000-0000-000000000000',
-          type: 'REVIEW_ASSIGNED',
-          title: 'New Manuscript Assigned for Review',
-          message: `You have been assigned by EC Chair to evaluate paper: "${assigningPaper.title}".`,
-          send_email: true
-        }]);
-      }
-
-      alert(`Matagumpay na na-assign si ${chosenProf?.full_name || 'Reviewer'}!`);
-      setAssigningPaper(null);
-      setSelectedReviewerId('');
-      fetchSubmissions();
-    } catch (err) {
-      console.error('Assignment Error:', err);
-      alert('Na-assign na ang Reviewer!');
-      setAssigningPaper(null);
-    }
-  };
+  const scoresPaper = submissions.find((s) => s.id === scoresId);
+  const docPaper = doc && submissions.find((s) => s.id === doc.paperId);
 
   return (
-    <div className="w-full pt-6 pb-12 px-6 max-w-7xl mx-auto space-y-6">
-      <div className="flex justify-between items-center pb-4 border-b border-slate-200">
+    <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Submissions & Reviewer Assignment (EC Chair)</h1>
-          <p className="text-xs text-slate-500">Mag-assign ng reviewers mula sa Peer Reviewers Roster at i-monitor ang evaluation scores.</p>
+          <h1 className="text-2xl font-bold text-secondary-900 dark:text-white sm:text-3xl">Incoming Submissions Inbox</h1>
+          <p className="mt-1 text-sm text-secondary-500 dark:text-secondary-400">
+            Review, assign, and render decisions on submitted research proposals.
+          </p>
         </div>
-        <button
-          onClick={fetchSubmissions}
-          className="px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold flex items-center space-x-1.5 shadow-sm text-slate-700 hover:bg-slate-50"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-          <span>Refresh Live Submissions</span>
-        </button>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-secondary-400" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search tracking #, title..."
+              className="w-64 rounded-xl border border-secondary-300 bg-white py-2 pl-9 pr-3 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/40 dark:border-secondary-700 dark:bg-secondary-800 dark:text-slate-100"
+            />
+          </div>
+          <div className="inline-flex rounded-xl bg-secondary-100 p-1 dark:bg-secondary-800">
+            {[['card', LayoutGrid, 'Card View'], ['table', Table2, 'Table View']].map(([mode, Icon, text]) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => setView(mode)}
+                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors ${
+                  view === mode
+                    ? 'bg-white text-primary-600 shadow-sm dark:bg-secondary-900'
+                    : 'text-secondary-500 hover:text-secondary-700 dark:hover:text-secondary-300'
+                }`}
+              >
+                <Icon className="h-4 w-4" />
+                {text}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
-      {loading ? (
-        <div className="p-12 text-center text-xs font-semibold text-slate-400">Loading live submissions...</div>
-      ) : submissions.length === 0 ? (
-        <div className="border-2 border-dashed border-slate-200 rounded-2xl p-12 text-center space-y-2 bg-white/50">
-          <Inbox className="w-10 h-10 text-slate-300 mx-auto" />
-          <h3 className="text-sm font-bold text-slate-700">Walang Submissions sa Database</h3>
-          <p className="text-xs text-slate-400">Mag-submit sa Author account para lumabas dito nang live!</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {submissions.map((paper) => (
-            <div key={paper.id} className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4 flex flex-col justify-between">
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-xs font-mono font-bold text-[#456882] bg-[#456882]/10 px-2 py-0.5 rounded">
-                    {paper.tracking_number || paper.id.substring(0, 8)}
-                  </span>
-                  <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full ${
-                    paper.status === 'ACCEPTED' ? 'bg-emerald-100 text-emerald-800' :
-                    paper.status === 'DECLINED' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'
-                  }`}>
-                    {paper.status}
-                  </span>
+      {loadError && (
+        <p role="alert" className="mt-6 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
+          Could not load submissions: {loadError}. Make sure you ran supabase_workflow.sql and your account has the ADMIN role.
+        </p>
+      )}
+
+      {filtered.length === 0 ? (
+        <p className="mt-8 rounded-2xl border border-dashed border-secondary-300 bg-white px-6 py-12 text-center text-sm text-secondary-500 dark:border-secondary-700 dark:bg-secondary-900">
+          {loading ? 'Loading submissions...' : submissions.length === 0 ? 'No papers have been submitted yet. New submissions from authors appear here instantly.' : 'No submissions match your search.'}
+        </p>
+      ) : view === 'card' ? (
+        <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {filtered.map((p) => (
+            <div
+              key={p.id}
+              className="flex flex-col justify-between gap-4 rounded-2xl border border-secondary-200 bg-white p-5 shadow-card dark:border-secondary-800 dark:bg-secondary-900"
+            >
+              <div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-secondary-500">{p.id}</span>
+                  <StatusBadge status={p.status} />
                 </div>
-
-                <h3 className="text-base font-bold text-slate-900 leading-snug">{paper.title}</h3>
-
-                {/* ASSIGNED REVIEWERS & SCORES TELEMETRY */}
-                <div className="pt-2 border-t border-slate-100 space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Assigned Peer Reviewers:</span>
-                    <button
-                      onClick={() => setAssigningPaper(paper)}
-                      className="px-2.5 py-1 bg-[#1B3C53] text-white text-[11px] font-bold rounded-lg flex items-center space-x-1 hover:bg-[#456882]"
-                    >
-                      <UserPlus className="w-3 h-3" />
-                      <span>Assign Reviewer</span>
-                    </button>
-                  </div>
-
-                  {(!paper.reviewer_assignments || paper.reviewer_assignments.length === 0) ? (
-                    <p className="text-[11px] text-slate-400 italic">Wala pang naka-assign na Reviewer.</p>
-                  ) : (
-                    <div className="space-y-1">
-                      {paper.reviewer_assignments.map((asgn, aIdx) => {
-                        const reviewScore = paper.reviews?.find(r => r.reviewer_id === asgn.reviewer_id);
-                        return (
-                          <div key={aIdx} className="text-[11px] bg-[#F9F3EF] p-2 rounded-lg border flex justify-between items-center">
-                            <span className="font-semibold text-slate-800 flex items-center space-x-1">
-                              <UserCheck className="w-3.5 h-3.5 text-[#456882]" />
-                              <span>Reviewer #{aIdx + 1} ({asgn.assignment_status})</span>
-                            </span>
-                            <span className="font-bold text-[#1B3C53]">
-                              {reviewScore ? reviewScore.decision : 'Pending Review'}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
+                <h3 className="mt-3 font-semibold leading-snug text-secondary-900 dark:text-white">{p.title}</h3>
+                <p className="mt-1 text-sm text-secondary-500">By {p.author}</p>
+                <div className="mt-3"><Keywords list={p.keywords} /></div>
+                <p className="mt-3 text-xs text-secondary-500">
+                  Reviewers: {p.assignments.length ? p.assignments.map((a) => a.reviewerName).join(', ') : 'none assigned'}
+                </p>
               </div>
-
-              <div className="pt-3 border-t border-slate-100 flex justify-between items-center">
-                <span className="text-xs text-slate-400">{paper.reviewer_assignments?.length || 0} Reviewers Assigned</span>
-                <button
-                  onClick={() => {
-                    setActiveLetterPaperId(paper.id);
-                    setSelectedPaperStatus(paper.status === 'SUBMITTED' ? 'ACCEPTED' : paper.status);
-                    setSelectedPaperAuthorEmail(paper.author_email || '');
-                    setSelectedPaperAuthorId(paper.author_id);
-                  }}
-                  className="px-3.5 py-1.5 bg-[#1B3C53] hover:bg-[#456882] text-white text-xs font-bold rounded-xl flex items-center space-x-1.5 shadow-sm transition-colors"
-                >
-                  <Eye className="w-3.5 h-3.5" />
-                  <span>Open Decision Editor</span>
-                </button>
+              <div className="flex items-end justify-between border-t border-secondary-100 pt-3 dark:border-secondary-800">
+                <div>
+                  <span className="flex items-center gap-1.5 text-sm font-semibold text-secondary-700 dark:text-secondary-200">
+                    <UserCheck className="h-4 w-4" /> {p.reviewsDone}/{p.reviewsTotal} Reviews
+                  </span>
+                  <p className="mt-0.5 text-xs text-secondary-500">{p.consensus}</p>
+                </div>
+                <ActionMenu actions={actionsFor(p)} />
               </div>
             </div>
           ))}
         </div>
-      )}
-
-      {/* ASSIGN REVIEWER MODAL */}
-      {assigningPaper && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 border text-slate-800 space-y-4 shadow-2xl">
-            <div className="flex justify-between items-center border-b pb-3">
-              <h3 className="text-sm font-bold flex items-center space-x-2">
-                <UserPlus className="w-4 h-4 text-[#1B3C53]" />
-                <span>Assign Reviewer from Roster</span>
-              </h3>
-              <button onClick={() => setAssigningPaper(null)}><X className="w-4 h-4 text-slate-400" /></button>
-            </div>
-
-            <div className="space-y-1">
-              <span className="text-[11px] font-bold text-slate-400 uppercase">Target Manuscript:</span>
-              <p className="text-xs font-semibold text-slate-900 bg-slate-50 p-2.5 rounded-lg border">{assigningPaper.title}</p>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-700 block">Select Qualified Peer Reviewer *</label>
-              <select
-                value={selectedReviewerId}
-                onChange={(e) => setSelectedReviewerId(e.target.value)}
-                className="w-full bg-slate-50 border rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-[#456882]"
-              >
-                <option value="">-- Choose Reviewer --</option>
-                {availableReviewers.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.full_name} {r.work_field ? `(${r.work_field})` : ''}
-                  </option>
+      ) : (
+        <div className="mt-8 overflow-x-auto rounded-2xl border border-secondary-200 bg-white shadow-card dark:border-secondary-800 dark:bg-secondary-900">
+          <table className="w-full min-w-[860px] text-left text-sm">
+            <thead className="border-b border-secondary-200 text-xs uppercase tracking-wide text-secondary-500 dark:border-secondary-800">
+              <tr>
+                {['Tracking Number', 'Title & Keywords', 'Author', 'Status', 'Reviews Progress', 'Consensus'].map((h) => (
+                  <th key={h} className="px-4 py-3 font-semibold">{h}</th>
                 ))}
-              </select>
-            </div>
-
-            <div className="flex justify-end space-x-2 pt-3 border-t">
-              <button onClick={() => setAssigningPaper(null)} className="px-4 py-2 bg-slate-100 text-xs font-bold rounded-xl">Cancel</button>
-              <button onClick={handleAssignReviewer} className="px-5 py-2 bg-[#1B3C53] text-white text-xs font-bold rounded-xl flex items-center space-x-1">
-                <CheckCircle2 className="w-4 h-4" /><span>Confirm Assignment</span>
-              </button>
-            </div>
-          </div>
+                <th className="px-4 py-3 text-right font-semibold">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-secondary-100 dark:divide-secondary-800">
+              {filtered.map((p) => (
+                <tr key={p.id}>
+                  <td className="px-4 py-3 font-bold text-secondary-900 dark:text-white">{p.id}</td>
+                  <td className="max-w-xs px-4 py-3">
+                    <p className="font-semibold text-secondary-900 dark:text-white">{p.title}</p>
+                    <div className="mt-1"><Keywords list={p.keywords} /></div>
+                  </td>
+                  <td className="px-4 py-3">{p.author}</td>
+                  <td className="px-4 py-3"><StatusBadge status={p.status} /></td>
+                  <td className="px-4 py-3"><strong>{p.reviewsDone}/{p.reviewsTotal}</strong> completed</td>
+                  <td className="px-4 py-3 text-xs text-secondary-500">{p.consensus}</td>
+                  <td className="px-4 py-3 text-right"><ActionMenu actions={actionsFor(p)} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
-      {/* Notice Editor Modal */}
-      {activeLetterPaperId && (
-        <LetterEditor
-          paperId={activeLetterPaperId}
-          authorUserId={selectedPaperAuthorId}
-          recipientEmail={selectedPaperAuthorEmail}
-          initialStatus={selectedPaperStatus}
-          onClose={() => {
-            setActiveLetterPaperId(null);
-            fetchSubmissions();
-          }}
-        />
-      )}
+      {assignId && <AssignReviewerModal paperId={assignId} onClose={() => setAssignId(null)} />}
+      {scoresPaper && <ReviewScoresModal paper={scoresPaper} onClose={() => setScoresId(null)} />}
+      {docPaper && <LetterEditor key={docPaper.id} paper={docPaper} initialTemplate={doc.template} onClose={() => setDoc(null)} />}
     </div>
   );
 }

@@ -1,20 +1,24 @@
 import { useChair } from '../../context/chairContext';
 
 export default function ChairReports() {
-  const { submissions } = useChair();
+  const { submissions, reviewers } = useChair();
 
   const stats = [
-    { label: 'Total Submissions', value: submissions.length, note: 'Active 2026 Cycle Protocols', color: '' },
-    { label: 'Approved Protocols', value: submissions.filter((s) => s.status === 'Approved').length, note: 'Full clearance granted', color: 'text-green-700 dark:text-green-400' },
-    { label: 'Pending Review', value: submissions.filter((s) => s.status === 'For Review' || s.status === 'Resubmission').length, note: 'Awaiting reviewer feedback', color: 'text-amber-700 dark:text-amber-400' },
-    { label: 'Rejections / Revisions', value: submissions.filter((s) => s.status === 'Rejected').length, note: 'Returned for modifications', color: 'text-red-600 dark:text-red-400' },
+    { label: 'Total Submissions', value: submissions.length, note: 'All submitted papers', color: '' },
+    { label: 'Accepted Papers', value: submissions.filter((s) => s.status === 'Approved').length, note: 'Accepted by the committee', color: 'text-green-700 dark:text-green-400' },
+    { label: 'Pending Review', value: submissions.filter((s) => s.status === 'For Review').length, note: 'Awaiting reviewer feedback', color: 'text-amber-700 dark:text-amber-400' },
+    { label: 'Declined / Revisions', value: submissions.filter((s) => s.status === 'Rejected' || s.status === 'Resubmission').length, note: 'Returned or declined', color: 'text-red-600 dark:text-red-400' },
   ];
 
-  // Static for now, same as the vanilla version. Compute from real data later.
+  const totalAssignments = submissions.reduce((n, s) => n + s.assignments.length, 0);
+  const completed = submissions.reduce((n, s) => n + s.assignments.filter((a) => a.status === 'COMPLETED').length, 0);
+  const rated = submissions.flatMap((s) => s.reviews).filter((r) => r.rating != null);
+  const avgRating = rated.length ? (rated.reduce((n, r) => n + Number(r.rating), 0) / rated.length).toFixed(1) : '-';
   const metrics = [
-    { label: 'Average Review Cycle Duration', value: '4.2 Business Days', color: '' },
-    { label: 'Compliance Audit Score', value: '98.4% (Optimal)', color: 'text-green-700 dark:text-green-400' },
-    { label: 'Active Panelist Capacity Utilization', value: '76.5%', color: '' },
+    { label: 'Review assignments completed', value: `${completed} of ${totalAssignments}`, color: '' },
+    { label: 'Papers with no reviewer yet', value: submissions.filter((s) => s.assignments.length === 0).length, color: '' },
+    { label: 'Average reviewer rating', value: avgRating === '-' ? '-' : `${avgRating} / 5`, color: '' },
+    { label: 'Registered users', value: reviewers.length, color: '' },
   ];
 
   return (
@@ -37,7 +41,7 @@ export default function ChairReports() {
       </div>
 
       <div className="mt-6 rounded-2xl border border-secondary-200 bg-white p-6 shadow-card dark:border-secondary-800 dark:bg-secondary-900">
-        <h3 className="font-bold text-secondary-900 dark:text-white">Committee Workflow Performance & Turnaround Metrics</h3>
+        <h3 className="font-bold text-secondary-900 dark:text-white">Review Progress</h3>
         <div className="mt-4 divide-y divide-secondary-100 dark:divide-secondary-800">
           {metrics.map((m) => (
             <div key={m.label} className="flex items-center justify-between py-3 text-sm">
