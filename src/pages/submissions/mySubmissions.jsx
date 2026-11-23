@@ -19,8 +19,13 @@ import {
   Send,
   AlertCircle,
   Eye,
-  GraduationCap
+  GraduationCap,
+  Trash2
 } from 'lucide-react';
+import { supabase, isBackendConfigured } from '../../lib/supabaseClient';
+
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export default function MySubmissions() {
   // Sub-navigation state for "My Submissions"
@@ -34,9 +39,12 @@ export default function MySubmissions() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState('Nov 7, 2026 • 07:48 PM');
 
-  // Selected Paper Modal State
+  // Selected Paper Modal & Delete State
   const [selectedPaper, setSelectedPaper] = useState(null);
   const [showNoticeViewer, setShowNoticeViewer] = useState(false);
+  const [paperToDelete, setPaperToDelete] = useState(null);
+  const [isDeletingPaper, setIsDeletingPaper] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   // Form State for Author Submission Form
   const [newPaperTitle, setNewPaperTitle] = useState('');
@@ -193,6 +201,67 @@ export default function MySubmissions() {
     }, 1500);
   };
 
+  // Delete Submission Handler
+  const handleConfirmDelete = async () => {
+    if (!paperToDelete || isDeletingPaper) return;
+
+    const target = paperToDelete;
+    const targetIndex = papers.findIndex((p) => p.id === target.id);
+
+    setIsDeletingPaper(true);
+    setDeleteError('');
+    setPapers((prev) => prev.filter((p) => p.id !== target.id));
+    if (selectedPaper?.id === target.id) {
+      setSelectedPaper(null);
+      setShowNoticeViewer(false);
+    }
+    setPaperToDelete(null);
+
+    if (isBackendConfigured && UUID_REGEX.test(target.id)) {
+      try {
+        const { data: files } = await supabase
+          .from('submission_files')
+          .select('storage_key')
+          .eq('submission_id', target.id);
+
+        const storageKeys = (files ?? [])
+          .map((f) => f.storage_key)
+          .filter(Boolean);
+
+        if (storageKeys.length > 0) {
+          await supabase.storage.from('submissions').remove(storageKeys);
+          await supabase
+            .from('submission_files')
+            .delete()
+            .eq('submission_id', target.id);
+        }
+
+        const { error } = await supabase
+          .from('submissions')
+          .delete()
+          .eq('id', target.id);
+
+        if (error) throw error;
+      } catch (err) {
+        console.error('[Colloquium] Failed to delete submission:', err);
+        setPapers((prev) => {
+          const next = [...prev];
+          next.splice(Math.max(targetIndex, 0), 0, target);
+          return next;
+        });
+        setDeleteError(
+          err.message ||
+            'Could not delete submission. Check foreign-key constraints or RLS delete policies.'
+        );
+      } finally {
+        setIsDeletingPaper(false);
+      }
+      return;
+    }
+
+    setIsDeletingPaper(false);
+  };
+
   const renderPaperIcon = (type) => {
     switch (type) {
       case 'cpu':
@@ -223,6 +292,7 @@ export default function MySubmissions() {
           <span className="text-slate-400 font-normal">Updated:</span>
           <span className="text-[#1B3C53]">{lastUpdated}</span>
           <button
+            type="button"
             onClick={handleRefresh}
             title="Refresh Status"
             className="p-1 hover:bg-[#F9F3EF] rounded-md transition-colors text-[#456882]"
@@ -231,6 +301,22 @@ export default function MySubmissions() {
           </button>
         </div>
       </div>
+
+      {deleteError && (
+        <div className="p-4 bg-red-50 border border-red-200 text-red-800 rounded-xl flex items-center justify-between gap-3">
+          <div className="flex items-center space-x-2.5 text-xs font-semibold">
+            <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+            <span>{deleteError}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setDeleteError('')}
+            className="text-red-600 hover:text-red-800 p-1"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* SUB-NAVIGATION TABS */}
       <div className="bg-white p-1.5 rounded-2xl border border-[#D2C1B6]/40 shadow-sm flex flex-col sm:flex-row gap-1">
@@ -243,6 +329,7 @@ export default function MySubmissions() {
           const isSubActive = activeSubTab === subTab.id;
           return (
             <button
+              type="button"
               key={subTab.id}
               onClick={() => setActiveSubTab(subTab.id)}
               className={`flex-1 flex items-center justify-center space-x-2 py-2.5 px-4 rounded-xl text-xs sm:text-sm font-bold transition-all duration-200 ${
@@ -464,6 +551,7 @@ export default function MySubmissions() {
                 const isActive = activeTab === tab.label;
                 return (
                   <button
+                    type="button"
                     key={tab.label}
                     onClick={() => setActiveTab(tab.label)}
                     className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-200 flex items-center space-x-1.5 ${
@@ -496,6 +584,7 @@ export default function MySubmissions() {
               />
               {searchQuery && (
                 <button
+                  type="button"
                   onClick={() => setSearchQuery('')}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
                 >
@@ -513,6 +602,7 @@ export default function MySubmissions() {
                 <h3 className="text-base font-semibold text-black">No paper submissions found</h3>
                 <p className="text-xs text-slate-500 mt-1">Try adjusting your filters or search keywords.</p>
                 <button
+                  type="button"
                   onClick={() => {
                     setActiveTab('All Papers');
                     setSearchQuery('');
@@ -598,13 +688,25 @@ export default function MySubmissions() {
                       </div>
                     </div>
 
-                    <button
-                      onClick={() => setSelectedPaper(paper)}
-                      className="w-full sm:w-auto px-4 py-2 border-2 border-[#456882] text-[#456882] hover:bg-[#456882] hover:text-white text-xs font-bold rounded-xl transition-all duration-200 flex items-center justify-center space-x-1 shadow-sm"
-                    >
-                      <span>View Details</span>
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
+                    <div className="w-full sm:w-auto flex flex-wrap items-center justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setPaperToDelete(paper)}
+                        className="flex-1 sm:flex-initial px-3.5 py-2 border border-red-200 text-red-700 hover:bg-red-50 text-xs font-bold rounded-xl transition-all duration-200 flex items-center justify-center space-x-1.5"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Delete</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setSelectedPaper(paper)}
+                        className="flex-1 sm:flex-initial px-4 py-2 border-2 border-[#456882] text-[#456882] hover:bg-[#456882] hover:text-white text-xs font-bold rounded-xl transition-all duration-200 flex items-center justify-center space-x-1 shadow-sm"
+                      >
+                        <span>View Details</span>
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))
@@ -689,6 +791,7 @@ export default function MySubmissions() {
                             </span>
                           ) : (
                             <button
+                              type="button"
                               onClick={() => {
                                 const updatedPapers = papers.map(p => {
                                   if (p.id === paper.id) {
@@ -734,6 +837,7 @@ export default function MySubmissions() {
                           className="text-xs text-slate-500 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-[#1B3C53] file:text-white hover:file:bg-[#456882] cursor-pointer"
                         />
                         <button
+                          type="button"
                           onClick={() => alert(`Revised file successfully uploaded for ${paper.id}`)}
                           className="w-full sm:w-auto px-4 py-2 bg-[#456882] text-white text-xs font-bold rounded-xl hover:bg-[#1B3C53] transition-colors"
                         >
@@ -746,6 +850,49 @@ export default function MySubmissions() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* DELETE CONFIRMATION MODAL */}
+      {paperToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl max-w-md w-full border border-[#D2C1B6] shadow-2xl p-6 space-y-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-base font-semibold text-black">Delete Submission?</h3>
+                <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                  Are you sure you want to delete{' '}
+                  <span className="font-mono font-bold text-[#1B3C53]">{paperToDelete.id}</span>{' '}
+                  (&ldquo;{paperToDelete.title}&rdquo;)?
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPaperToDelete(null)}
+                className="text-slate-400 hover:text-slate-700 p-1 rounded-lg"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setPaperToDelete(null)}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isDeletingPaper}
+                onClick={handleConfirmDelete}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl transition-colors"
+              >
+                {isDeletingPaper ? 'Deleting...' : 'Delete Submission'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -770,6 +917,7 @@ export default function MySubmissions() {
                 </h3>
               </div>
               <button
+                type="button"
                 onClick={() => setSelectedPaper(null)}
                 className="text-slate-300 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors"
               >
@@ -811,7 +959,6 @@ export default function MySubmissions() {
                       <div className="flex justify-between items-center text-xs">
                         <span className="font-semibold text-black">{rev.reviewer}</span>
                         <div className="flex items-center space-x-2">
-                          {/* Rating: lalabas lang kapag HINDI "For Review" */}
                           {selectedPaper.status !== 'For Review' && rev.rating && (
                             <span className="text-slate-400">Rating: <strong className="text-slate-700">{rev.rating}</strong></span>
                           )}
@@ -821,7 +968,6 @@ export default function MySubmissions() {
                         </div>
                       </div>
                       
-                      {/* Comments/Feedback: lalabas lang kapag HINDI "For Review" */}
                       {selectedPaper.status !== 'For Review' && rev.comments && (
                         <p className="text-xs text-slate-600 italic">"{rev.comments}"</p>
                       )}
@@ -834,12 +980,14 @@ export default function MySubmissions() {
             {/* Modal Footer with View Notice Button */}
             <div className="p-4 bg-slate-50 border-t border-slate-200 rounded-b-2xl flex justify-end space-x-3">
               <button
+                type="button"
                 onClick={() => setSelectedPaper(null)}
                 className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs rounded-xl transition-colors"
               >
                 Close
               </button>
               <button
+                type="button"
                 onClick={() => setShowNoticeViewer(true)}
                 className="px-4 py-2 bg-[#1B3C53] hover:bg-[#456882] text-white font-bold text-xs rounded-xl flex items-center space-x-2 transition-colors shadow-sm"
               >
@@ -865,10 +1013,11 @@ export default function MySubmissions() {
               </div>
               
               <div className="flex items-center space-x-3 text-slate-300">
-                <button title="Download" className="hover:text-white p-1 rounded">
+                <button type="button" title="Download" className="hover:text-white p-1 rounded">
                   <Download className="w-4 h-4" />
                 </button>
                 <button 
+                  type="button"
                   onClick={() => setShowNoticeViewer(false)} 
                   className="hover:text-white p-1 rounded bg-white/10"
                 >
