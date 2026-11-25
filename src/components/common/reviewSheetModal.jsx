@@ -7,7 +7,7 @@ import { reviewSheet } from '../../lib/db';
 export default function ReviewSheetModal({ review, trackingNumber, title, onClose }) {
   const { letter, signatories } = reviewSheet({ review, trackingNumber, title });
   return createPortal(
-    <div className="fixed inset-0 z-[90] overflow-y-auto bg-secondary-100 p-4 sm:p-8 dark:bg-secondary-950">
+    <div className="print-portal fixed inset-0 z-[90] overflow-y-auto bg-secondary-100 p-4 sm:p-8 dark:bg-secondary-950">
       <div className="mx-auto mb-4 flex max-w-[760px] justify-end gap-2 print:hidden">
         <button type="button" onClick={() => window.print()} className="inline-flex items-center gap-1.5 rounded-lg border border-secondary-400 bg-white px-3 py-1.5 text-sm font-semibold"><Printer className="h-4 w-4" /> Print / PDF</button>
         <button type="button" onClick={onClose} className="inline-flex items-center gap-1.5 rounded-lg bg-primary-600 px-3 py-1.5 text-sm font-semibold text-white"><X className="h-4 w-4" /> Close</button>

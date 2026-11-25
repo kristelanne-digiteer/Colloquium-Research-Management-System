@@ -47,3 +47,23 @@ body {
     box-shadow: none;
   }
 }
+
+/* Full-screen sheets opened from a modal (review sheet): print every page of the sheet,
+   not just the first one, and hide the app + any modal behind it. */
+@media print {
+  body:has(.print-portal) > *:not(.print-portal) {
+    display: none !important;
+  }
+  .print-portal {
+    position: static !important;
+    inset: auto !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    background: #fff !important;
+  }
+  .print-portal .print-area {
+    position: static !important;
+    max-width: none !important;
+    box-shadow: none;
+  }
+}

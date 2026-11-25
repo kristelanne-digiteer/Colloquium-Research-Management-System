@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import {
-  Search, LayoutGrid, Table2, UserCheck, UserPlus, ClipboardList, FileSignature, CheckCircle2, Ban, Trash2,
+  Search, LayoutGrid, Table2, UserCheck, UserPlus, ClipboardList, FileSignature, CheckCircle2, Ban, Trash2, Eye, Printer,
 } from 'lucide-react';
 import { useChair } from '../../context/chairContext';
 import StatusBadge from '../../components/chair/statusBadge';
@@ -8,6 +8,7 @@ import ActionMenu from '../../components/chair/actionMenu';
 import AssignReviewerModal from '../../components/chair/assignReviewerModal';
 import ReviewScoresModal from '../../components/chair/reviewScoresModal';
 import LetterEditor from '../../components/chair/letterEditor';
+import ReviewSheetModal from '../../components/common/reviewSheetModal';
 
 function Keywords({ list }) {
   return (
@@ -28,6 +29,7 @@ export default function ChairSubmissions() {
   const [assignId, setAssignId] = useState(null);
   const [scoresId, setScoresId] = useState(null);
   const [doc, setDoc] = useState(null); // { paperId, type, date }
+  const [sheet, setSheet] = useState(null); // { paper, review } -> submitted review sheet (view / print)
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -38,7 +40,23 @@ export default function ChairSubmissions() {
 
   const openLetter = (paperId, template) => setDoc({ paperId, template });
 
+  // One submitted review -> open its sheet right away (with Print). Several -> pick from the scores list.
+  const openReviews = (p) => (p.reviews.length === 1 ? setSheet({ paper: p, review: p.reviews[0] }) : setScoresId(p.id));
+
+  const ReviewButton = ({ p }) =>
+    p.reviews.length > 0 ? (
+      <button
+        type="button"
+        onClick={() => openReviews(p)}
+        className="mt-1.5 inline-flex items-center gap-1.5 rounded-lg border border-primary-200 bg-primary-50 px-2.5 py-1 text-xs font-semibold text-primary-700 hover:bg-primary-100 dark:border-primary-800 dark:bg-primary-900/30 dark:text-primary-300"
+      >
+        <Eye className="h-3.5 w-3.5" /> {p.reviews.length === 1 ? 'View review' : `View ${p.reviews.length} reviews`}
+        <Printer className="h-3.5 w-3.5 opacity-70" />
+      </button>
+    ) : null;
+
   const actionsFor = (p) => [
+    ...(p.reviews.length ? [{ label: p.reviews.length === 1 ? 'View / Print review' : 'View / Print reviews', icon: Eye, onClick: () => openReviews(p) }] : []),
     { label: 'Assign Reviewer', icon: UserPlus, onClick: () => setAssignId(p.id) },
     { label: 'Reviewer scores', icon: ClipboardList, onClick: () => setScoresId(p.id) },
     { label: 'Write decision letter', icon: FileSignature, onClick: () => openLetter(p.id, p.status === 'Rejected' ? 'REJECTED' : p.status === 'Resubmission' ? 'REVISIONS' : 'ACCEPTED') },
@@ -139,6 +157,7 @@ export default function ChairSubmissions() {
                     <UserCheck className="h-4 w-4" /> {p.reviewsDone}/{p.reviewsTotal} Reviews
                   </span>
                   <p className="mt-0.5 text-xs text-secondary-500">{p.consensus}</p>
+                  <ReviewButton p={p} />
                 </div>
                 <ActionMenu actions={actionsFor(p)} />
               </div>
@@ -166,7 +185,7 @@ export default function ChairSubmissions() {
                   </td>
                   <td className="px-4 py-3">{p.author}</td>
                   <td className="px-4 py-3"><StatusBadge status={p.status} /></td>
-                  <td className="px-4 py-3"><strong>{p.reviewsDone}/{p.reviewsTotal}</strong> completed</td>
+                  <td className="px-4 py-3"><strong>{p.reviewsDone}/{p.reviewsTotal}</strong> completed<br /><ReviewButton p={p} /></td>
                   <td className="px-4 py-3 text-xs text-secondary-500">{p.consensus}</td>
                   <td className="px-4 py-3 text-right"><ActionMenu actions={actionsFor(p)} /></td>
                 </tr>
@@ -176,6 +195,7 @@ export default function ChairSubmissions() {
         </div>
       )}
 
+      {sheet && <ReviewSheetModal review={sheet.review} trackingNumber={sheet.paper.id} title={sheet.paper.title} onClose={() => setSheet(null)} />}
       {assignId && <AssignReviewerModal paperId={assignId} onClose={() => setAssignId(null)} />}
       {scoresPaper && <ReviewScoresModal paper={scoresPaper} onClose={() => setScoresId(null)} />}
       {docPaper && <LetterEditor key={docPaper.id} paper={docPaper} initialTemplate={doc.template} onClose={() => setDoc(null)} />}

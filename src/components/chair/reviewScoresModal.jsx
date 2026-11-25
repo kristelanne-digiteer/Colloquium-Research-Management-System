@@ -42,7 +42,7 @@ export default function ReviewScoresModal({ paper, onClose }) {
       ) : (
         <ul className="space-y-3">
           {paper.assignments.map((a) => {
-            const review = paper.reviews.find((r) => r.reviewerName === a.reviewerName);
+            const review = paper.reviews.find((r) => r.reviewerId === a.reviewerId);
             return (
               <li key={a.id} className="rounded-xl border border-secondary-200 p-4 dark:border-secondary-800">
                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -71,7 +71,7 @@ export default function ReviewScoresModal({ paper, onClose }) {
                     </div>
                     {review.comments && <p className="mt-2 line-clamp-3 whitespace-pre-wrap text-secondary-600 dark:text-secondary-300">{review.comments}</p>}
                     <div className="mt-2 flex flex-wrap items-center gap-4">
-                      <button type="button" onClick={() => setSheet(review)} className="text-xs font-semibold text-primary-600 hover:underline">View review sheet (PDF)</button>
+                      <button type="button" onClick={() => setSheet(review)} className="text-xs font-semibold text-primary-600 hover:underline">View / Print review sheet</button>
                       <button
                         type="button"
                         onClick={() => window.confirm(`Delete the review by ${review.reviewerName}? Their assignment goes back to pending and they can write it again.`) && deleteReview(paper, review)}
