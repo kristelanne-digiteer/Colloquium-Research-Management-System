@@ -32,4 +32,8 @@ const authApi = () => ({
   },
 })
 
-export default defineConfig({ plugins: [react(), authApi()] })
+export default defineConfig({
+  plugins: [react(), authApi()],
+  // lets a tunnel (cloudflared / ngrok) hostname reach the dev server
+  server: { host: true, allowedHosts: true },
+})
