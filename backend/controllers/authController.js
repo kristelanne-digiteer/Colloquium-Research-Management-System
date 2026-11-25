@@ -306,6 +306,40 @@ export const resetPassword = async (req, res) => {
   }
 };
 
+export const changePassword = async (req, res) => {
+  try {
+    const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body || {};
+    const email = normalizeEmail(body.email);
+    const { currentPassword, newPassword } = body;
+
+    if (!isEmail(email) || !currentPassword || !newPassword) {
+      throw httpError(400, 'All password fields are required.');
+    }
+    if (newPassword.length < 8) {
+      throw httpError(400, 'New password must be at least 8 characters.');
+    }
+
+    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+      email,
+      password: currentPassword,
+    });
+
+    if (signInError || !signInData?.user) {
+      throw httpError(401, 'Current password is incorrect.');
+    }
+
+    const { error: updateError } = await supabase.auth.admin.updateUserById(
+      signInData.user.id,
+      { password: newPassword }
+    );
+    if (updateError) throw httpError(400, updateError.message);
+
+    res.status(200).json({ message: 'Password updated successfully.' });
+  } catch (err) {
+    sendError(res, err, 'Failed to change password.');
+  }
+};
+
 // =====================================================================
 // NOTIFICATION SERVICE (Stage 1 acceptance, Stage 2 endorsement, rejection)
 // =====================================================================

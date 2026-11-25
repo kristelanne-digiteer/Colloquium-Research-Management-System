@@ -6,6 +6,7 @@ const handlers = {
   'resend-pin': auth.resendPin,
   'forgot-password': auth.forgotPassword,
   'reset-password': auth.resetPassword,
+  'change-password': auth.changePassword,
   'notify-decision': auth.notifyDecision,
 };
 

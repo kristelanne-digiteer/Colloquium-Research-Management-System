@@ -10,6 +10,7 @@ import {
   Building2,
   BookOpen,
   Phone,
+  Lock,
 } from 'lucide-react';
 import FormInput from '../../components/common/formInput';
 import SelectField from '../../components/common/selectField';
@@ -44,6 +45,21 @@ export default function AccountSettings() {
     submissionUpdates: true,
     reviewReminders: false,
   });
+
+  // Change password state
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [passwordStatus, setPasswordStatus] = useState({ type: '', message: '' });
+
+  const isGoogleUser =
+    user?.app_metadata?.provider === 'google' ||
+    (Array.isArray(user?.app_metadata?.providers) &&
+      user.app_metadata.providers.includes('google') &&
+      !user.app_metadata.providers.includes('email'));
 
   useEffect(() => {
     if (profile) {
@@ -110,6 +126,64 @@ export default function AccountSettings() {
     });
     setSaving(false);
     setSaveMessage(error ? error.message : 'Profile saved successfully.');
+  };
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    setPasswordStatus({ type: '', message: '' });
+
+    if (passwordForm.newPassword.length < 8) {
+      setPasswordStatus({
+        type: 'error',
+        message: 'New password must be at least 8 characters.',
+      });
+      return;
+    }
+
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setPasswordStatus({
+        type: 'error',
+        message: 'New passwords do not match.',
+      });
+      return;
+    }
+
+    setChangingPassword(true);
+    try {
+      const res = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: user?.email,
+          currentPassword: passwordForm.currentPassword,
+          newPassword: passwordForm.newPassword,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setPasswordStatus({
+          type: 'error',
+          message: data.error || 'Failed to change password.',
+        });
+      } else {
+        setPasswordStatus({
+          type: 'success',
+          message: data.message || 'Password updated successfully.',
+        });
+        setPasswordForm({
+          currentPassword: '',
+          newPassword: '',
+          confirmPassword: '',
+        });
+      }
+    } catch {
+      setPasswordStatus({
+        type: 'error',
+        message: 'Network error while updating password.',
+      });
+    } finally {
+      setChangingPassword(false);
+    }
   };
 
   const handleToggleNotification = async (key) => {
@@ -198,7 +272,13 @@ export default function AccountSettings() {
               className="w-full resize-none rounded-xl border border-slate-300 bg-white px-3.5 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
             />
           </div>
-          <FormInput label="Email address" name="email" icon={MailIcon} value={user?.email || ''} onChange={() => {}} />
+          <FormInput
+            label="Email address"
+            name="email"
+            icon={MailIcon}
+            value={user?.email || ''}
+            onChange={() => {}}
+          />
 
           {saveMessage && (
             <p className="text-sm font-medium text-primary-600">{saveMessage}</p>
@@ -216,7 +296,11 @@ export default function AccountSettings() {
 
         <div className="mt-4 flex items-center justify-between py-3">
           <div className="flex items-center gap-3">
-            {darkMode ? <Moon className="h-5 w-5 text-slate-500" /> : <Sun className="h-5 w-5 text-slate-500" />}
+            {darkMode ? (
+              <Moon className="h-5 w-5 text-slate-500" />
+            ) : (
+              <Sun className="h-5 w-5 text-slate-500" />
+            )}
             <div>
               <p className="text-sm font-medium text-slate-900 dark:text-white">Dark mode</p>
               <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -231,7 +315,9 @@ export default function AccountSettings() {
           <div className="flex items-center gap-3">
             <Bell className="h-5 w-5 text-slate-500" />
             <div>
-              <p className="text-sm font-medium text-slate-900 dark:text-white">Email notifications</p>
+              <p className="text-sm font-medium text-slate-900 dark:text-white">
+                Email notifications
+              </p>
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 Receive general updates via email.
               </p>
@@ -245,7 +331,9 @@ export default function AccountSettings() {
 
         <div className="flex items-center justify-between border-t border-slate-100 py-3 dark:border-slate-800">
           <div>
-            <p className="text-sm font-medium text-slate-900 dark:text-white">Submission status updates</p>
+            <p className="text-sm font-medium text-slate-900 dark:text-white">
+              Submission status updates
+            </p>
             <p className="text-xs text-slate-500 dark:text-slate-400">
               Get notified when a submission changes status.
             </p>
@@ -258,7 +346,9 @@ export default function AccountSettings() {
 
         <div className="flex items-center justify-between border-t border-slate-100 py-3 dark:border-slate-800">
           <div>
-            <p className="text-sm font-medium text-slate-900 dark:text-white">Review reminders</p>
+            <p className="text-sm font-medium text-slate-900 dark:text-white">
+              Review reminders
+            </p>
             <p className="text-xs text-slate-500 dark:text-slate-400">
               Reminders for upcoming review deadlines.
             </p>
@@ -268,6 +358,80 @@ export default function AccountSettings() {
             onChange={() => handleToggleNotification('reviewReminders')}
           />
         </div>
+      </section>
+
+      {/* Change password card */}
+      <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-card dark:border-slate-800 dark:bg-slate-900">
+        <h2 className="text-base font-semibold text-slate-900 dark:text-white">
+          Change password
+        </h2>
+        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+          Update your password to keep your account secure.
+        </p>
+
+        {isGoogleUser ? (
+          <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-800/60 dark:text-slate-300">
+            This account uses Google sign-in. Password changes are managed through your Google Account.
+          </div>
+        ) : (
+          <form onSubmit={handleChangePassword} className="mt-4 space-y-4">
+            <FormInput
+              label="Current password"
+              name="currentPassword"
+              type="password"
+              icon={Lock}
+              placeholder="Enter current password"
+              value={passwordForm.currentPassword}
+              onChange={(e) =>
+                setPasswordForm((p) => ({ ...p, currentPassword: e.target.value }))
+              }
+              autoComplete="current-password"
+              required
+            />
+            <FormInput
+              label="New password"
+              name="newPassword"
+              type="password"
+              icon={Lock}
+              placeholder="At least 8 characters"
+              value={passwordForm.newPassword}
+              onChange={(e) =>
+                setPasswordForm((p) => ({ ...p, newPassword: e.target.value }))
+              }
+              autoComplete="new-password"
+              required
+            />
+            <FormInput
+              label="Confirm new password"
+              name="confirmPassword"
+              type="password"
+              icon={Lock}
+              placeholder="Re-enter new password"
+              value={passwordForm.confirmPassword}
+              onChange={(e) =>
+                setPasswordForm((p) => ({ ...p, confirmPassword: e.target.value }))
+              }
+              autoComplete="new-password"
+              required
+            />
+
+            {passwordStatus.message && (
+              <p
+                className={`text-sm font-medium ${
+                  passwordStatus.type === 'success'
+                    ? 'text-emerald-600 dark:text-emerald-400'
+                    : 'text-red-600 dark:text-red-400'
+                }`}
+              >
+                {passwordStatus.message}
+              </p>
+            )}
+
+            <Button type="submit" loading={changingPassword} className="sm:w-auto">
+              Update password
+            </Button>
+          </form>
+        )}
       </section>
 
       {/* Danger zone */}
