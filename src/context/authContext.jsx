@@ -32,10 +32,32 @@ const MOCK_PROFILE = {
   },
 };
 
+async function postAuth(path, payload) {
+  const res = await fetch(`/api/auth${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  let data = {};
+  try {
+    data = await res.json();
+  } catch {
+    data = {};
+  }
+
+  if (!res.ok) {
+    return { data: null, error: new Error(data.error || 'Authentication request failed.') };
+  }
+
+  return { data, error: null };
+}
+
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(DEV_BYPASS ? { user: MOCK_USER } : null);
   const [profile, setProfile] = useState(DEV_BYPASS ? MOCK_PROFILE : null);
   const [loading, setLoading] = useState(!DEV_BYPASS);
+  const [pendingCredentials, setPendingCredentials] = useState(null);
   const [activeRoleState, setActiveRoleState] = useState(
     () => localStorage.getItem(ROLE_STORAGE_KEY) || 'author'
   );
@@ -102,19 +124,21 @@ export function AuthProvider({ children }) {
 
   const signUp = async ({ email, password, fullName, affiliation, fieldOfStudy, phone }) => {
     if (DEV_BYPASS) return { data: { user: MOCK_USER }, error: null };
-    return supabase.auth.signUp({
+
+    const { data, error } = await postAuth('/register', {
+      name: fullName,
       email,
       password,
-      options: {
-        data: {
-          full_name: fullName,
-          affiliation,
-          field_of_study: fieldOfStudy,
-          work_field: fieldOfStudy,
-          phone_number: phone,
-        },
-      },
+      affiliation,
+      field_of_study: fieldOfStudy,
+      phone_number: phone,
     });
+
+    if (!error) {
+      setPendingCredentials({ email, password });
+    }
+
+    return { data, error };
   };
 
   const signInWithPassword = async ({ email, password }) => {
@@ -144,26 +168,58 @@ export function AuthProvider({ children }) {
       setProfile(MOCK_PROFILE);
       return { data: { user: MOCK_USER }, error: null };
     }
-    return supabase.auth.verifyOtp({ email, token, type: 'signup' });
+
+    const { data, error } = await postAuth('/verify-pin', { email, pin: token });
+    if (error) return { data: null, error };
+
+    // Auto-sign in if we still have the password from signUp so avatar & tracks can be saved.
+    if (pendingCredentials?.email?.toLowerCase() === String(email || '').trim().toLowerCase() && pendingCredentials?.password) {
+      const signInRes = await supabase.auth.signInWithPassword({
+        email: pendingCredentials.email,
+        password: pendingCredentials.password,
+      });
+      setPendingCredentials(null);
+      if (signInRes.error) {
+        return { data, error: null };
+      }
+      return { data: signInRes.data, error: null };
+    }
+
+    return { data, error: null };
   };
 
   const verifyRecoveryOtp = async ({ email, token }) => {
     if (DEV_BYPASS) return { data: {}, error: null };
-    return supabase.auth.verifyOtp({ email, token, type: 'recovery' });
+    setPendingCredentials((prev) => ({ ...(prev || {}), email, recoveryCode: token }));
+    return { data: { verified: true }, error: null };
   };
 
   const resendSignupOtp = async ({ email }) => {
     if (DEV_BYPASS) return { data: {}, error: null };
-    return supabase.auth.resend({ type: 'signup', email });
+    return postAuth('/resend-pin', { email });
   };
 
   const sendPasswordResetOtp = async ({ email }) => {
     if (DEV_BYPASS) return { data: {}, error: null };
-    return supabase.auth.resetPasswordForEmail(email);
+    setPendingCredentials({ email });
+    return postAuth('/forgot-password', { email });
   };
 
   const updatePassword = async ({ password }) => {
     if (DEV_BYPASS) return { data: {}, error: null };
+
+    if (pendingCredentials?.email && pendingCredentials?.recoveryCode) {
+      const res = await postAuth('/reset-password', {
+        email: pendingCredentials.email,
+        code: pendingCredentials.recoveryCode,
+        newPassword: password,
+      });
+      if (!res.error) {
+        setPendingCredentials(null);
+      }
+      return res;
+    }
+
     return supabase.auth.updateUser({ password });
   };
 
@@ -217,6 +273,7 @@ export function AuthProvider({ children }) {
       setProfile(null);
       return { error: null };
     }
+    setPendingCredentials(null);
     return supabase.auth.signOut();
   };
 
