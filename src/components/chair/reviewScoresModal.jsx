@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { ClipboardList, FileText } from 'lucide-react';
+import { ClipboardList, FileText, Trash2 } from 'lucide-react';
 import Modal from '../common/modal';
 import ChairButton from './chairButton';
 import { decisionLabel } from '../../lib/db';
 import { useChair } from '../../context/chairContext';
 import ManuscriptViewer from '../common/manuscriptViewer';
 import ReviewSheetModal from '../common/reviewSheetModal';
+import ReviewReports from '../common/reviewReports';
 
 const tone = {
   APPROVED: 'bg-green-100 text-green-800',
@@ -15,7 +16,7 @@ const tone = {
 
 // Live assignment status + each reviewer's decision, rating and feedback for one paper.
 export default function ReviewScoresModal({ paper, onClose }) {
-  const { unassignReviewer } = useChair();
+  const { unassignReviewer, deleteReview } = useChair();
   const [sheet, setSheet] = useState(null);
   const [showFile, setShowFile] = useState(false);
   return (
@@ -69,11 +70,23 @@ export default function ReviewScoresModal({ paper, onClose }) {
 
                     </div>
                     {review.comments && <p className="mt-2 line-clamp-3 whitespace-pre-wrap text-secondary-600 dark:text-secondary-300">{review.comments}</p>}
-                    <button type="button" onClick={() => setSheet(review)} className="mt-2 text-xs font-semibold text-primary-600 hover:underline">View review sheet (PDF)</button>
+                    <div className="mt-2 flex flex-wrap items-center gap-4">
+                      <button type="button" onClick={() => setSheet(review)} className="text-xs font-semibold text-primary-600 hover:underline">View review sheet (PDF)</button>
+                      <button
+                        type="button"
+                        onClick={() => window.confirm(`Delete the review by ${review.reviewerName}? Their assignment goes back to pending and they can write it again.`) && deleteReview(paper, review)}
+                        className="inline-flex items-center gap-1 text-xs font-semibold text-red-600 hover:underline"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" /> Delete review
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <p className="mt-3 text-xs text-secondary-400">Waiting for this reviewer&apos;s scorecard.</p>
                 )}
+                <div className="mt-3 border-t border-secondary-100 pt-3 dark:border-secondary-800">
+                  <ReviewReports submissionId={paper.dbId} reviewerId={a.reviewerId} />
+                </div>
               </li>
             );
           })}

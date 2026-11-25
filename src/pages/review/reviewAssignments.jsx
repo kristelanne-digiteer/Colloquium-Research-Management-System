@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ClipboardCheck } from 'lucide-react';
+import { ClipboardCheck, Pencil } from 'lucide-react';
 import { supabase, isBackendConfigured } from '../../lib/supabaseClient';
 import { useAuth } from '../../context/authContext';
-import { decisionLabel, fmtDate } from '../../lib/db';
+import { chairStatus, decisionLabel, fmtDate } from '../../lib/db';
 import ReviewFeedbackEditor from '../../components/common/reviewFeedbackEditor';
 
 // Papers explicitly assigned to the logged-in user by the EC Chair, plus the review scorecard.
@@ -73,6 +73,28 @@ export default function ReviewAssignments() {
     load();
   };
 
+  // Edit / update a review that was already sent.
+  const updateReview = async ({ decision, text, sheet }) => {
+    const patch = { decision, comments_summary: text, feedback_letter: sheet };
+    let { data, error: re } = await supabase.from('reviews').update(patch).eq('id', active.review.id).select('id');
+    if (re && /feedback_letter/.test(re.message)) {
+      delete patch.feedback_letter;
+      ({ data, error: re } = await supabase.from('reviews').update(patch).eq('id', active.review.id).select('id'));
+    }
+    if (re) return `Could not update review: ${re.message}`;
+    if (!data?.length) return 'Could not update the review (blocked by the database). Run the SQL in supabase-reviewer-crud.sql once.';
+    await supabase.rpc('notify_admins', {
+      p_title: 'Review updated',
+      p_message: `${active.sub?.tracking_number ?? ''}: ${decisionLabel(decision)}`,
+      p_data: { submissionId: active.submission_id },
+    });
+    setActive(null);
+    load();
+  };
+
+  // A review can be edited until the EC Chair has made a final decision on the paper.
+  const canModify = (r) => Boolean(r.review) && !['Approved', 'Rejected'].includes(chairStatus(r.sub?.status, r.sub?.revision_deadline));
+
   return (
     <div className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 sm:py-12">
       <h1 className="text-2xl font-bold text-secondary-900 dark:text-white sm:text-3xl">Review Assignments</h1>
@@ -103,9 +125,19 @@ export default function ReviewAssignments() {
                     <span className={`rounded-full px-3 py-1 text-xs font-semibold ${done ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
                       {done ? 'Completed' : String(r.assignment_status).replace(/_/g, ' ')}
                     </span>
-                    <button type="button" onClick={() => setActive(r)} className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-700">
-                      {done ? 'View my review' : 'Review paper'}
-                    </button>
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                      {done && canModify(r) && (
+                        <>
+                          <button type="button" onClick={() => setActive({ ...r, _edit: true })} aria-label={`Edit review of ${r.sub?.tracking_number ?? 'paper'}`} title="Edit review" className="inline-flex items-center gap-1.5 rounded-lg border border-primary-300 px-3 py-2 text-sm font-semibold text-primary-700 hover:bg-primary-50">
+                            <Pencil className="h-4 w-4" /> Edit
+                          </button>
+                        </>
+                      )}
+                      <button type="button" onClick={() => setActive(r)} className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-700">
+                        {done ? 'View my review' : 'Review paper'}
+                      </button>
+                    </div>
+                    {done && !canModify(r) && <p className="text-xs text-secondary-400">Locked: the EC Chair already decided on this paper.</p>}
                   </div>
                 </div>
               </li>
@@ -120,6 +152,9 @@ export default function ReviewAssignments() {
           assignment={active}
           reviewerName={profile?.full_name || user?.email || 'Reviewer'}
           onSubmit={submitReview}
+          onUpdate={updateReview}
+          canModify={canModify(active)}
+          reportsLocked={['Approved', 'Rejected'].includes(chairStatus(active.sub?.status, active.sub?.revision_deadline))}
           onClose={() => setActive(null)}
         />
       )}

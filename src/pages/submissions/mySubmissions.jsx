@@ -1,8 +1,10 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { supabase, isBackendConfigured } from '../../lib/supabaseClient';
 import { useAuth } from '../../context/authContext';
-import { authorStatus, decisionLabel, fmtDate } from '../../lib/db';
+import { authorStatus, decisionLabel, fmtDate, MANUSCRIPT_BUCKET, folderOf } from '../../lib/db';
 import PaperManage from '../../components/common/paperManage';
+import SelectField from '../../components/common/selectField';
+import { TRACK_GROUPS } from '../../lib/options';
 import ReviewSheetModal from '../../components/common/reviewSheetModal';
 import {
   FileText,
@@ -24,7 +26,8 @@ import {
   Send,
   AlertCircle,
   Eye,
-  GraduationCap
+  GraduationCap,
+  Trash2
 } from 'lucide-react';
 
 export default function MySubmissions() {
@@ -54,7 +57,6 @@ export default function MySubmissions() {
   const { user, profile } = useAuth();
   const [papers, setPapers] = useState([]);
   const [sheet, setSheet] = useState(null);
-  const [tracks, setTracks] = useState([]);
   const [submitError, setSubmitError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadFile, setUploadFile] = useState(null);
@@ -64,6 +66,32 @@ export default function MySubmissions() {
     Approved: ['border-l-emerald-500', 'bg-emerald-100 text-emerald-800 border-emerald-200'],
     Declined: ['border-l-red-500', 'bg-red-100 text-red-800 border-red-200'],
     Resubmission: ['border-l-[#456882]', 'bg-[#456882]/15 text-[#1B3C53] border-[#456882]/30'],
+  };
+
+  // Delete a submission straight from the list (confirm modal first)
+  const [paperToDelete, setPaperToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+
+  const confirmDeletePaper = async () => {
+    if (!paperToDelete || !user) return;
+    setIsDeleting(true);
+    setDeleteError('');
+    const { error } = await supabase.from('submissions').delete().eq('id', paperToDelete.dbId);
+    if (error) {
+      setDeleteError(`Could not delete: ${error.message}`);
+      setIsDeleting(false);
+      return;
+    }
+    // Remove the uploaded manuscript too (same folder PaperManage uses)
+    const folder = folderOf(user.id, paperToDelete.dbId);
+    const { data: files } = await supabase.storage.from(MANUSCRIPT_BUCKET).list(folder);
+    const paths = (files ?? []).filter((f) => f.id).map((f) => `${folder}/${f.name}`);
+    if (paths.length) await supabase.storage.from(MANUSCRIPT_BUCKET).remove(paths);
+    setIsDeleting(false);
+    setPaperToDelete(null);
+    if (selectedPaper?.dbId === paperToDelete.dbId) setSelectedPaper(null);
+    await loadPapers();
   };
 
   // Load this author's own submissions + the reviews on them (live)
@@ -123,7 +151,6 @@ export default function MySubmissions() {
   useEffect(() => {
     loadPapers();
     if (!isBackendConfigured || !user) return;
-    supabase.from('tracks').select('code,name').eq('active', true).order('sort_order').then(({ data }) => setTracks(data ?? []));
     const channel = supabase.channel(`author-${user.id}`);
     ['submissions', 'reviews'].forEach((table) =>
       channel.on('postgres_changes', { event: '*', schema: 'public', table }, () => loadPapers())
@@ -327,14 +354,14 @@ export default function MySubmissions() {
 
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-[#1B3C53]">Research Category / Track *</label>
-                <select
+                <SelectField
+                  name="paperCategory"
                   value={newPaperCategory}
                   onChange={(e) => setNewPaperCategory(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-[#F9F3EF] border border-[#D2C1B6]/40 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:border-[#456882] focus:bg-white"
-                >
-                  <option value="">Auto-assign a default category</option>
-                  {tracks.map((t) => <option key={t.code} value={t.code}>{t.name}</option>)}
-                </select>
+                  groups={TRACK_GROUPS}
+                  placeholder="Type to search a category (or leave blank to auto-assign)"
+                  clearable
+                />
               </div>
 
               <div className="space-y-1.5">
@@ -633,13 +660,25 @@ export default function MySubmissions() {
                       </div>
                     </div>
 
-                    <button
-                      onClick={() => setSelectedPaper(paper)}
-                      className="w-full sm:w-auto px-4 py-2 border-2 border-[#456882] text-[#456882] hover:bg-[#456882] hover:text-white text-xs font-bold rounded-xl transition-all duration-200 flex items-center justify-center space-x-1 shadow-sm"
-                    >
-                      <span>View Details</span>
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
+                    <div className="flex w-full sm:w-auto items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => { setDeleteError(''); setPaperToDelete(paper); }}
+                        aria-label={`Delete submission ${paper.id}`}
+                        title="Delete submission"
+                        className="px-3 py-2 border-2 border-red-300 text-red-600 hover:bg-red-600 hover:border-red-600 hover:text-white text-xs font-bold rounded-xl transition-all duration-200 flex items-center justify-center shadow-sm"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedPaper(paper)}
+                        className="flex-1 sm:flex-none px-4 py-2 border-2 border-[#456882] text-[#456882] hover:bg-[#456882] hover:text-white text-xs font-bold rounded-xl transition-all duration-200 flex items-center justify-center space-x-1 shadow-sm"
+                      >
+                        <span>View Details</span>
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))
@@ -785,6 +824,40 @@ export default function MySubmissions() {
       )}
 
       {/* PAPER DETAIL MODAL */}
+      {paperToDelete && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
+            <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-red-100">
+              <Trash2 className="h-5 w-5 text-red-600" />
+            </div>
+            <h3 className="text-base font-bold text-black">Delete this submission?</h3>
+            <p className="mt-1 text-sm text-slate-600">
+              <span className="font-mono font-bold text-[#456882]">{paperToDelete.id}</span> &mdash; {paperToDelete.title}
+            </p>
+            <p className="mt-2 text-xs text-slate-500">This permanently removes the submission and its uploaded file. This cannot be undone.</p>
+            {deleteError && <p role="alert" className="mt-3 text-xs font-semibold text-red-600">{deleteError}</p>}
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={() => setPaperToDelete(null)}
+                className="rounded-xl border border-slate-300 px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={confirmDeletePaper}
+                className="rounded-xl bg-red-600 px-4 py-2 text-xs font-bold text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                {isDeleting ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {selectedPaper && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-[#D2C1B6] shadow-2xl flex flex-col">

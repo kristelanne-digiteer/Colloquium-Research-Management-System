@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowLeft, PenLine, Printer, Send, X } from 'lucide-react';
+import { ArrowLeft, Pencil, PenLine, Printer, Send, X } from 'lucide-react';
 import LetterPaper from './letterPaper';
 import ManuscriptViewer from './manuscriptViewer';
+import ReviewReports from './reviewReports';
 import SignaturePad from '../chair/signaturePad';
 import { DECISIONS, decisionLabel } from '../../lib/db';
 
@@ -17,12 +18,13 @@ export function composeFeedback(letter) {
 
 // Same sheet as the EC Chair's letter editor, but for a review: the paper on the left,
 // the feedback sheet on the right. readOnly shows a review that was already submitted.
-export default function ReviewFeedbackEditor({ assignment, reviewerName, onSubmit, onClose }) {
+export default function ReviewFeedbackEditor({ assignment, reviewerName, onSubmit, onUpdate, canModify = false, reportsLocked = false, onClose }) {
   const sub = assignment.sub;
   const done = Boolean(assignment.review);
 
   const [decision, setDecision] = useState(assignment.review?.decision ?? 'APPROVED');
-  const [sig, setSig] = useState(null);
+  const [editing, setEditing] = useState(Boolean(done && canModify && assignment._edit));
+  const [sig, setSig] = useState(assignment.review?.feedback_letter?.signatories?.[0]?.signature_url ?? null);
   const [padOpen, setPadOpen] = useState(false);
   const [font, setFont] = useState('Inter');
   const [size, setSize] = useState(14);
@@ -51,7 +53,25 @@ export default function ReviewFeedbackEditor({ assignment, reviewerName, onSubmi
     [assignment, sub, done]
   );
   const stored = assignment.review?.feedback_letter;
-  const [letter, setLetter] = useState(stored?.letter ?? initial);
+  const withComments = (l) => (l.comments ? l : { ...l, comments: [''] });
+  const [letter, setLetter] = useState(() => {
+    const base = stored?.letter ?? initial;
+    return editing ? withComments(base) : base;
+  });
+  // A review that was already sent is read-only until the reviewer presses Edit.
+  const readOnly = done && !editing;
+
+  const startEdit = () => {
+    setLetter((l) => withComments(l));
+    setEditing(true);
+  };
+  const cancelEdit = () => {
+    setLetter(stored?.letter ?? initial);
+    setDecision(assignment.review?.decision ?? 'APPROVED');
+    setSig(stored?.signatories?.[0]?.signature_url ?? null);
+    setError('');
+    setEditing(false);
+  };
 
   const pickDecision = (value) => {
     setDecision(value);
@@ -62,9 +82,9 @@ export default function ReviewFeedbackEditor({ assignment, reviewerName, onSubmi
     setError('');
     const text = composeFeedback(letter);
     if (text.replace(/Overall assessment:/i, '').trim().length < 10) return setError('Write your feedback on the sheet before submitting.');
-    if (!window.confirm('Submit this review to the EC Chair? You cannot edit it afterwards.')) return;
+    if (!window.confirm(done ? 'Save your changes to this review? The EC Chair will be notified.' : 'Submit this review to the EC Chair?')) return;
     setBusy(true);
-    const err = await onSubmit({
+    const err = await (done ? onUpdate : onSubmit)({
       decision,
       text,
       sheet: { letter, signatories: [{ id: 'me', full_name: reviewerName, position: 'Peer Reviewer', signature_url: sig }] },
@@ -78,10 +98,10 @@ export default function ReviewFeedbackEditor({ assignment, reviewerName, onSubmi
       <header className="flex flex-wrap items-center gap-3 border-b border-secondary-200 bg-white px-4 py-3 print:hidden dark:border-secondary-800 dark:bg-secondary-900">
         <button type="button" onClick={onClose} aria-label="Close" className="rounded-lg p-2 text-secondary-500 hover:bg-secondary-100"><ArrowLeft className="h-5 w-5" /></button>
         <div className="mr-auto min-w-0">
-          <h2 className="text-base font-bold text-secondary-900 dark:text-white">{done ? 'Your submitted review' : 'Write review feedback'}</h2>
+          <h2 className="text-base font-bold text-secondary-900 dark:text-white">{done ? (editing ? 'Edit your review' : 'Your submitted review') : 'Write review feedback'}</h2>
           <p className="truncate text-xs text-secondary-500">{sub?.tracking_number} &middot; {sub?.title}</p>
         </div>
-        {!done && (
+        {!readOnly && (
           <>
             <label className="text-xs font-semibold text-secondary-500" htmlFor="rf-decision">Recommendation</label>
             <select id="rf-decision" value={decision} onChange={(e) => pickDecision(e.target.value)} className="rounded-lg border border-secondary-300 bg-white px-3 py-2 text-sm dark:border-secondary-700 dark:bg-secondary-800">
@@ -101,9 +121,21 @@ export default function ReviewFeedbackEditor({ assignment, reviewerName, onSubmi
           </>
         )}
         <button type="button" onClick={() => window.print()} className="inline-flex items-center gap-1.5 rounded-lg border border-secondary-400 px-3 py-2 text-sm font-semibold text-secondary-600 hover:bg-secondary-50"><Printer className="h-4 w-4" /> Print</button>
-        {!done && (
+        {readOnly && canModify && (
+          <>
+            <button type="button" onClick={startEdit} disabled={busy} className="inline-flex items-center gap-1.5 rounded-lg border border-secondary-400 px-3 py-2 text-sm font-semibold text-secondary-600 hover:bg-secondary-50 disabled:opacity-60">
+              <Pencil className="h-4 w-4" /> Edit review
+            </button>
+          </>
+        )}
+        {done && editing && (
+          <button type="button" onClick={cancelEdit} disabled={busy} className="rounded-lg border border-secondary-300 px-3 py-2 text-sm font-semibold text-secondary-600 hover:bg-secondary-50 disabled:opacity-60">
+            Cancel
+          </button>
+        )}
+        {!readOnly && (
           <button type="button" onClick={submit} disabled={busy} className="inline-flex items-center gap-1.5 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-60">
-            <Send className="h-4 w-4" /> {busy ? 'Sending...' : 'Send to EC Chair'}
+            <Send className="h-4 w-4" /> {busy ? (done ? 'Saving...' : 'Sending...') : done ? 'Save changes' : 'Send to EC Chair'}
           </button>
         )}
       </header>
@@ -117,6 +149,11 @@ export default function ReviewFeedbackEditor({ assignment, reviewerName, onSubmi
             <p className="mt-1 text-sm font-semibold text-secondary-900 dark:text-white">{sub?.title}</p>
             <p className="mt-2 max-h-28 overflow-y-auto whitespace-pre-wrap text-xs text-secondary-600 dark:text-secondary-300">{sub?.abstract}</p>
           </div>
+          {sub && (
+            <div className="border-b border-secondary-200 px-4 py-3 dark:border-secondary-800">
+              <ReviewReports submissionId={sub.id} reviewerId={assignment.reviewer_id} editable={!reportsLocked} />
+            </div>
+          )}
           {sub && <ManuscriptViewer authorId={sub.author_id} submissionId={sub.id} height="65vh" />}
         </section>
 
@@ -124,8 +161,9 @@ export default function ReviewFeedbackEditor({ assignment, reviewerName, onSubmi
           <LetterPaper
             letter={letter}
             onChange={setLetter}
-            editable={!done}
-            signatories={done && stored?.signatories ? stored.signatories : [{ id: 'me', full_name: reviewerName, position: 'Peer Reviewer', signature_url: sig }]}
+            editable={!readOnly}
+            allowImages
+            signatories={readOnly && stored?.signatories ? stored.signatories : [{ id: 'me', full_name: reviewerName, position: 'Peer Reviewer', signature_url: sig }]}
             fontFamily={font === 'Inter' ? undefined : font}
             fontSize={size}
           />

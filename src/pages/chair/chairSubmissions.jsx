@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import {
-  Search, LayoutGrid, Table2, UserCheck, UserPlus, ClipboardList, FileSignature, CheckCircle2, Ban,
+  Search, LayoutGrid, Table2, UserCheck, UserPlus, ClipboardList, FileSignature, CheckCircle2, Ban, Trash2,
 } from 'lucide-react';
 import { useChair } from '../../context/chairContext';
 import StatusBadge from '../../components/chair/statusBadge';
@@ -22,7 +22,7 @@ function Keywords({ list }) {
 }
 
 export default function ChairSubmissions() {
-  const { submissions, approveSubmission, rejectSubmission, requestRevision, loading, loadError } = useChair();
+  const { submissions, approveSubmission, rejectSubmission, requestRevision, deleteSubmission, loading, loadError } = useChair();
   const [view, setView] = useState('card');
   const [query, setQuery] = useState('');
   const [assignId, setAssignId] = useState(null);
@@ -54,6 +54,10 @@ export default function ChairSubmissions() {
     {
       label: 'Reject Submission', icon: Ban, tone: 'danger',
       onClick: () => window.confirm(`Mark ${p.id} as Rejected?`) && rejectSubmission(p.id),
+    },
+    {
+      label: 'Delete Submission', icon: Trash2, tone: 'danger',
+      onClick: () => window.confirm(`Permanently delete ${p.id} (${p.title})? Its reviews, reviewer assignments and uploaded file are removed too. This cannot be undone.`) && deleteSubmission(p.id),
     },
   ];
 

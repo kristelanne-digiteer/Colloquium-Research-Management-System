@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from './authContext';
 import { supabase, isBackendConfigured } from '../lib/supabaseClient';
-import { chairStatus, fmtDate, initialsOf } from '../lib/db';
+import { chairStatus, fmtDate, initialsOf, MANUSCRIPT_BUCKET, folderOf } from '../lib/db';
 
 // Live data for every /chair/* page, straight from Supabase:
 // submissions (all authors), reviewer roster (profiles), assignments, reviews, letters.
@@ -96,6 +96,7 @@ export function ChairProvider({ children }) {
         })),
         reviews: revs.map((r) => ({
           id: r.id,
+          reviewerId: r.reviewer_id,
           reviewerName: nameOf[r.reviewer_id] || 'Unnamed reviewer',
           decision: r.decision,
           rating: r.rating,
@@ -212,6 +213,53 @@ export function ChairProvider({ children }) {
     await load();
   };
 
+  // EC Chair deletes one reviewer's review. The assignment goes back to pending so the reviewer can write it again.
+  const deleteReview = async (paper, review) => {
+    const { data, error } = await supabase.from('reviews').delete().eq('id', review.id).select('id');
+    if (error) return notify(`Could not delete the review: ${error.message}`);
+    if (!data?.length) return notify('Could not delete the review (blocked by the database). Run supabase-chair-delete.sql once.');
+    const asg = paper.assignments.find((a) => a.reviewerId === review.reviewerId);
+    if (asg) await supabase.from('reviewer_assignments').update({ assignment_status: 'PENDING' }).eq('id', asg.id);
+    await pushNotification({
+      user_id: review.reviewerId,
+      type: 'REVIEW_REMOVED',
+      title: 'Your review was removed',
+      message: `${paper.id}: the EC Chair removed your review. Please submit it again.`,
+      data: { submissionId: paper.dbId, trackingNumber: paper.id },
+    });
+    notify(`Review by ${review.reviewerName} deleted. The assignment is pending again.`);
+    await load();
+  };
+
+  // EC Chair deletes a whole submission (reviews and assignments go with it) and its uploaded file.
+  const deleteSubmission = async (paperId) => {
+    const paper = submissions.find((p) => p.id === paperId);
+    if (!paper) return;
+    const { data, error } = await supabase.from('submissions').delete().eq('id', paper.dbId).select('id');
+    if (error) return notify(`Could not delete ${paperId}: ${error.message}`);
+    if (!data?.length) return notify('Could not delete the submission (blocked by the database). Run supabase-chair-delete.sql once.');
+    const folder = folderOf(paper.authorId, paper.dbId);
+    const { data: files } = await supabase.storage.from(MANUSCRIPT_BUCKET).list(folder);
+    const paths = (files ?? []).filter((f) => f.id).map((f) => `${folder}/${f.name}`);
+    if (paths.length) await supabase.storage.from(MANUSCRIPT_BUCKET).remove(paths);
+    // Plagiarism / AI reports uploaded by the reviewers (best-effort)
+    const { data: reviewerDirs } = await supabase.storage.from('review-reports').list(paper.dbId);
+    for (const dir of reviewerDirs ?? []) {
+      const { data: rf } = await supabase.storage.from('review-reports').list(`${paper.dbId}/${dir.name}`);
+      const rp = (rf ?? []).filter((f) => f.id).map((f) => `${paper.dbId}/${dir.name}/${f.name}`);
+      if (rp.length) await supabase.storage.from('review-reports').remove(rp);
+    }
+    await pushNotification({
+      user_id: paper.authorId,
+      type: 'SUBMISSION_DELETED',
+      title: 'Submission removed',
+      message: `${paper.id}: ${paper.title} was removed by the EC Chair.`,
+      data: { trackingNumber: paper.id },
+    });
+    notify(`Submission ${paperId} deleted.`);
+    await load();
+  };
+
   // Delete a letter: drafts live only in this session, sent ones are rows in public.letters.
   const deleteLetter = async (letter) => {
     if (String(letter.id).startsWith('DRAFT-')) {
@@ -310,7 +358,7 @@ export function ChairProvider({ children }) {
   const value = useMemo(
     () => ({
       submissions, reviewers, letters, signatories, chairName, loading, loadError, userId: user?.id,
-      notify, assignReviewer, requestRevision, unassignReviewer, deleteLetter, setReviewerRole, approveSubmission, rejectSubmission, saveSignatory, logLetter, reload: load,
+      notify, assignReviewer, requestRevision, unassignReviewer, deleteReview, deleteSubmission, deleteLetter, setReviewerRole, approveSubmission, rejectSubmission, saveSignatory, logLetter, reload: load,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [submissions, reviewers, letters, signatories, chairName, loading, loadError]

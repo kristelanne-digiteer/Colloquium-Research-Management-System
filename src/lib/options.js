@@ -830,3 +830,20 @@ export const EXPERTISE_OPTIONS = [
   'Visual Design',
   'Writing',
 ];
+
+// ---------------------------------------------------------------------------
+// TRACKS: one list shared by Field of study, Field of expertise (Account settings / Sign up)
+// and the Research Category / Track on the Author submission form.
+// Same groups as Field of study; the older flat expertise skills that are not
+// in Field of study are kept under "Other Skills" so nothing already saved disappears.
+// ---------------------------------------------------------------------------
+const FIELD_ITEMS = new Set(FIELD_OF_STUDY_GROUPS.flatMap((g) => g.options));
+export const TRACK_GROUPS = [
+  ...FIELD_OF_STUDY_GROUPS,
+  { group: 'Other Skills', options: EXPERTISE_OPTIONS.filter((o) => !FIELD_ITEMS.has(o)) },
+];
+
+// item -> group name (first group that holds it)
+const TRACK_TO_GROUP = {};
+TRACK_GROUPS.forEach((g) => g.options.forEach((o) => { if (!(o in TRACK_TO_GROUP)) TRACK_TO_GROUP[o] = g.group; }));
+export const groupOfTrack = (item) => TRACK_TO_GROUP[item] ?? 'Other Skills';
